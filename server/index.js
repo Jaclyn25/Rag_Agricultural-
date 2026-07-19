@@ -33,6 +33,10 @@ async function loadHistory(convId) {
   return history;
 }
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+});
+
 app.post("/api/chat", async (req, res) => {
   const { question, conversationId } = req.body;
   if (!question) return res.status(400).json({ error: "No question provided" });
