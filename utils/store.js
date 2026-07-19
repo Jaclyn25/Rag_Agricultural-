@@ -1,16 +1,16 @@
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createRequire } from "module";
 
-const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_FILE = path.join(DATA_DIR, "vectors.json");
 
-const DATA_FILE = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "data",
-  "vectors.json"
-);
+async function ensureDataDir() {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  } catch {}
+}
 
 const STOP_WORDS_AR = [
   "في", "من", "إلى", "عن", "على", "مع", "كان", "هذا", "هذه", "ذلك",
@@ -82,6 +82,7 @@ export async function readStore() {
 }
 
 export async function writeStore(data) {
+  await ensureDataDir();
   await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
 }
 

@@ -2,12 +2,15 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const DATA_FILE = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "data",
-  "conversations.json"
-);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_FILE = path.join(DATA_DIR, "conversations.json");
+
+async function ensureDataDir() {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  } catch {}
+}
 
 export async function readConversations() {
   try {
@@ -19,6 +22,7 @@ export async function readConversations() {
 }
 
 export async function writeConversations(data) {
+  await ensureDataDir();
   await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
