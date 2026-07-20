@@ -3,7 +3,7 @@ const state = {
   conversations: [],
   currentId: null,
   isProcessing: false,
-  settings: { theme: 'dark', fontSize: 'medium', model: 'groq', useHyde: false, useExpansion: false, useSelfRag: false },
+  settings: { theme: 'dark', fontSize: 'medium', model: 'groq', useHyde: false, useExpansion: false, useSelfRag: false, useMultiHop: false, useWebFallback: false },
 };
 
 const CONV_KEY = 'zeraea_conversations';
@@ -341,8 +341,14 @@ async function renderAdminTab() {
   const el = $('#sidebarAdmin');
   if (!el) return;
   try {
-    const res = await fetch('/api/knowledge/stats');
-    const data = await res.json();
+    const [statsRes, evalRes] = await Promise.all([
+      fetch('/api/knowledge/stats'),
+      fetch('/api/eval/results'),
+    ]);
+    const data = await statsRes.json();
+    const evalData = await evalRes.json();
+    const best = evalData.best;
+
     el.innerHTML = `
       <div class="admin-section">
         <h3>إحصائيات المعرفة</h3>
@@ -351,8 +357,20 @@ async function renderAdminTab() {
         <div class="stat-row"><span>آخر تحديث</span><strong>${data.stats.lastUpdated ? new Date(data.stats.lastUpdated).toLocaleDateString('ar-SA') : '-'}</strong></div>
       </div>
       <div class="admin-section">
+        <h3>نتائج التقييم</h3>
+        ${best ? `
+          <div class="stat-row"><span>الإعدادات المثلى</span><strong>alpha=${best.alpha}, k=${best.topK}</strong></div>
+          <div class="stat-row"><span>F1</span><strong style="color:var(--success)">${best.avgF1}%</strong></div>
+          <div class="stat-row"><span>الاستدعاء</span><strong>${best.avgRecall}%</strong></div>
+          <div class="stat-row"><span>الدقة</span><strong>${best.avgPrecision}%</strong></div>
+          <div class="stat-row"><span>الكلمات المفتاحية</span><strong>${best.avgKeywordMatch}%</strong></div>
+        ` : '<div style="font-size:12px;color:var(--text-faint)">لم يتم تشغيل التقييم بعد. شغّل من الأسفل.</div>'}
+      </div>
+      <div class="admin-section">
         <h3>الإجراءات</h3>
         <button class="admin-btn" onclick="reingestKnowledge()">🔄 إعادة استيراد المعرفة</button>
+        <button class="admin-btn" onclick="runEval()">🧪 تشغيل التقييم</button>
+        <button class="admin-btn" onclick="reembedAll()">🔁 إعادة تضمين الكل</button>
         <button class="admin-btn" onclick="loadQAKnowledge()">📝 عرض المعرفة المضافة</button>
       </div>
       <div class="admin-section" id="qaSection" style="display:none">
@@ -362,6 +380,25 @@ async function renderAdminTab() {
     `;
   } catch {
     el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-faint)">خطأ في تحميل الإحصائيات</div>';
+  }
+}
+
+async function runEval() {
+  try {
+    await fetch('/api/eval/run', { method: 'POST' });
+    toast('جاري تشغيل التقييم... قد يستغرق دقيقة', '');
+    setTimeout(() => renderAdminTab(), 2000);
+  } catch {
+    toast('خطأ في تشغيل التقييم', 'error');
+  }
+}
+
+async function reembedAll() {
+  try {
+    await fetch('/api/knowledge/reembed', { method: 'POST' });
+    toast('تم إعادة تضمين كل المعرفة!', 'success');
+  } catch {
+    toast('خطأ في إعادة التضمين', 'error');
   }
 }
 
@@ -486,6 +523,8 @@ async function sendQuestion() {
       useHyde: state.settings.useHyde || false,
       useExpansion: state.settings.useExpansion || false,
       useSelfRag: state.settings.useSelfRag || false,
+      useMultiHop: state.settings.useMultiHop || false,
+      useWebFallback: state.settings.useWebFallback || false,
     };
 
     const res = await fetch('/api/chat', {
@@ -627,6 +666,8 @@ function saveRetrievalOptions() {
   state.settings.useHyde = $('#useHyde').checked;
   state.settings.useExpansion = $('#useExpansion').checked;
   state.settings.useSelfRag = $('#useSelfRag').checked;
+  state.settings.useMultiHop = $('#useMultiHop').checked;
+  state.settings.useWebFallback = $('#useWebFallback').checked;
   saveSettings();
 }
 
@@ -739,6 +780,8 @@ async function init() {
   if (state.settings.useHyde) $('#useHyde').checked = true;
   if (state.settings.useExpansion) $('#useExpansion').checked = true;
   if (state.settings.useSelfRag) $('#useSelfRag').checked = true;
+  if (state.settings.useMultiHop) $('#useMultiHop').checked = true;
+  if (state.settings.useWebFallback) $('#useWebFallback').checked = true;
 
   renderConversations();
   renderMessages();

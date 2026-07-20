@@ -6,25 +6,13 @@ import dotenv from "dotenv";
 import { askQuestion } from "./chat.js";
 import { ingestAll } from "./ingest.js";
 import {
-  readConversations,
-  saveConversation,
-  deleteConversation,
-  getConversation,
+  readConversations, saveConversation, deleteConversation, getConversation,
 } from "../utils/conversations.js";
 import {
-  getStoreStats,
-  getKnowledgeIndex,
-  addToKnowledgeIndex,
-  removeFromKnowledgeIndex,
-  deleteBySource,
-  addFeedback,
-  getFeedback,
-  addQAKnowledge,
-  getQAKnowledge,
+  getStoreStats, getKnowledgeIndex, addToKnowledgeIndex, removeFromKnowledgeIndex,
+  deleteBySource, addFeedback, getFeedback, addQAKnowledge, getQAKnowledge, readStore,
 } from "../utils/store.js";
-import { chunkText } from "../utils/chunker.js";
-import { generateEmbeddings } from "../utils/embed.js";
-import { addChunks } from "../utils/store.js";
+import fs from "fs/promises";
 
 dotenv.config();
 
@@ -41,12 +29,10 @@ const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60000;
 const RATE_LIMIT_MAX = 30;
 
-function rateLimit(req, res, next) {
+function rateLimitMW(req, res, next) {
   const ip = req.ip || req.connection.remoteAddress;
   const now = Date.now();
-  if (!rateLimitMap.has(ip)) {
-    rateLimitMap.set(ip, []);
-  }
+  if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
   const timestamps = rateLimitMap.get(ip).filter(t => now - t < RATE_LIMIT_WINDOW);
   if (timestamps.length >= RATE_LIMIT_MAX) {
     return res.status(429).json({ error: "طلبات كثيرة جداً. الرجاء الانتظار قليلاً." });
@@ -65,21 +51,32 @@ async function loadHistory(convId) {
   return history;
 }
 
+function assignExperiment() {
+  const experiments = ["control", "hyde", "expansion", "multiHop", "webFallback"];
+  return experiments[Math.floor(Math.random() * experiments.length)];
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
 });
 
 app.post("/api/chat", async (req, res) => {
-  const { question, conversationId, model = "groq", useHyde = false, useExpansion = false, useSelfRag = false } = req.body;
+  const {
+    question, conversationId, model = "groq", useHyde = false,
+    useExpansion = false, useSelfRag = false, useMultiHop = false, useWebFallback = false
+  } = req.body;
   if (!question) return res.status(400).json({ error: "No question provided" });
 
   const convId = conversationId || crypto.randomUUID();
   const history = await loadHistory(convId);
-
   history.push({ role: "user", content: question });
 
+  const experimentId = assignExperiment();
+
   try {
-    const { stream, sources, noContext } = await askQuestion(question, history, { model, useHyde, useExpansion, useSelfRag });
+    const { stream, sources, noContext } = await askQuestion(question, history, {
+      model, useHyde, useExpansion, useSelfRag, useMultiHop, useWebFallback, experimentId,
+    });
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -88,14 +85,13 @@ app.post("/api/chat", async (req, res) => {
     if (noContext) {
       const reply = "عذراً، لا توجد معلومات كافية في قاعدة المعرفة للإجابة على هذا السؤال.";
       history.push({ role: "assistant", content: reply });
-      res.write(`data: ${JSON.stringify({ content: reply, conversationId: convId })}\n\n`);
+      res.write(`data: ${JSON.stringify({ content: reply, conversationId: convId, experimentId })}\n\n`);
       res.write("data: [DONE]\n\n");
       res.end();
       return;
     }
 
     let fullReply = "";
-
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || "";
       if (content) {
@@ -104,19 +100,14 @@ app.post("/api/chat", async (req, res) => {
       }
     }
 
-    if (fullReply) {
-      history.push({ role: "assistant", content: fullReply });
-    }
-
+    if (fullReply) history.push({ role: "assistant", content: fullReply });
     if (sources && sources.length > 0) {
       res.write(`data: ${JSON.stringify({ sources, conversationId: convId })}\n\n`);
     }
     res.write("data: [DONE]\n\n");
     res.end();
 
-    if (history.length > 50) {
-      historyCache.set(convId, history.slice(-30));
-    }
+    if (history.length > 50) historyCache.set(convId, history.slice(-30));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -127,7 +118,7 @@ app.post("/api/conversations", async (req, res) => {
     const conv = req.body;
     if (!conv || !conv.id) return res.status(400).json({ error: "Invalid conversation" });
     const saved = await saveConversation(conv);
-    historyCache.set(conv.id, conv.messages.map((m) => ({ role: m.role, content: m.content })));
+    historyCache.set(conv.id, conv.messages.map(m => ({ role: m.role, content: m.content })));
     res.json({ ok: true, id: saved.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -137,15 +128,11 @@ app.post("/api/conversations", async (req, res) => {
 app.get("/api/conversations", async (req, res) => {
   try {
     const all = await readConversations();
-    const summaries = all.map((c) => ({
-      id: c.id,
-      title: c.title,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-      preview: c.messages?.filter((m) => m.role === "assistant").pop()?.content?.slice(0, 50) || "",
+    res.json(all.map(c => ({
+      id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt,
+      preview: c.messages?.filter(m => m.role === "assistant").pop()?.content?.slice(0, 50) || "",
       messageCount: c.messages?.length || 0,
-    }));
-    res.json(summaries);
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -183,8 +170,7 @@ app.get("/api/knowledge/stats", async (req, res) => {
 
 app.get("/api/knowledge/sources", async (req, res) => {
   try {
-    const index = await getKnowledgeIndex();
-    res.json(index);
+    res.json(await getKnowledgeIndex());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -213,11 +199,11 @@ app.post("/api/knowledge/delete", async (req, res) => {
 
 app.post("/api/feedback", async (req, res) => {
   try {
-    const { conversationId, messageIndex, rating, comment } = req.body;
+    const { conversationId, messageIndex, rating, comment, experimentId } = req.body;
     if (!conversationId || rating === undefined) {
       return res.status(400).json({ error: "conversationId and rating required" });
     }
-    await addFeedback({ conversationId, messageIndex, rating, comment });
+    await addFeedback({ conversationId, messageIndex, rating, comment, experimentId, timestamp: Date.now() });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -236,18 +222,47 @@ app.post("/api/knowledge/qa", async (req, res) => {
 });
 
 app.get("/api/knowledge/qa", async (req, res) => {
+  try { res.json(await getQAKnowledge()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/feedback", async (req, res) => {
+  try { res.json(await getFeedback()); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get("/api/eval/results", async (req, res) => {
   try {
-    const qa = await getQAKnowledge();
-    res.json(qa);
+    const raw = await fs.readFile(path.join(__dirname, "..", "data", "eval_results.json"), "utf-8");
+    res.json(JSON.parse(raw));
+  } catch { res.json({ best: null, all: [], timestamp: null }); }
+});
+
+app.post("/api/eval/run", async (req, res) => {
+  try {
+    const { exec } = await import("child_process");
+    exec("node server/eval.js", (err, stdout, stderr) => {
+      if (err) return res.status(500).json({ error: stderr });
+      res.json({ ok: true, output: stdout });
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get("/api/feedback", async (req, res) => {
+app.post("/api/knowledge/reembed", async (req, res) => {
   try {
-    const feedback = await getFeedback();
-    res.json(feedback);
+    const store = await readStore();
+    const { generateEmbedding } = await import("../utils/embed.js");
+    let updated = 0;
+    for (const entry of store) {
+      const newEmbedding = await generateEmbedding(entry.text);
+      entry.embedding = newEmbedding;
+      entry.version = (entry.version || 1) + 1;
+      entry.ingestedAt = Date.now();
+      updated++;
+    }
+    const { writeStore } = await import("../utils/store.js");
+    await writeStore(store);
+    res.json({ ok: true, updatedChunks: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -113,6 +113,7 @@ export function cosineSimilarity(a, b) {
 
 export async function searchSimilar(queryEmbedding, topK = 5, queryText = "", alpha = 0.7, filterSource = null) {
   const store = await readStore();
+  const CONFIDENCE_THRESHOLD = 0.3;
 
   let filtered = store;
   if (filterSource) {
@@ -124,17 +125,24 @@ export async function searchSimilar(queryEmbedding, topK = 5, queryText = "", al
     score: cosineSimilarity(queryEmbedding, entry.embedding),
   }));
 
+  const maxDense = Math.max(...denseScores.map(d => d.score), 0);
+
   const bm25Scores = queryText ? bm25Score(queryText, filtered) : {};
+  const maxBm25 = Math.max(...Object.values(bm25Scores), 1);
 
   const combined = filtered.map((entry, i) => {
     const dense = denseScores[i].score;
     const keyword = bm25Scores[entry.id] || 0;
-    const maxBm25 = Math.max(...Object.values(bm25Scores), 1);
     const normalizedKeyword = maxBm25 > 0 ? keyword / maxBm25 : 0;
-    return {
-      ...entry,
-      score: alpha * dense + (1 - alpha) * normalizedKeyword,
-    };
+
+    let score;
+    if (maxDense < CONFIDENCE_THRESHOLD && queryText) {
+      score = normalizedKeyword;
+    } else {
+      score = alpha * dense + (1 - alpha) * normalizedKeyword;
+    }
+
+    return { ...entry, score, denseScore: dense, keywordScore: normalizedKeyword };
   });
 
   combined.sort((a, b) => b.score - a.score);
