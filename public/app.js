@@ -3,7 +3,7 @@ const state = {
   conversations: [],
   currentId: null,
   isProcessing: false,
-  settings: { theme: 'dark', fontSize: 'medium' },
+  settings: { theme: 'dark', fontSize: 'medium', model: 'groq', useHyde: false, useExpansion: false, useSelfRag: false },
 };
 
 const CONV_KEY = 'zeraea_conversations';
@@ -19,7 +19,6 @@ const inputEl = $('#questionInput');
 const sendBtn = $('#sendBtn');
 const sidebarEl = $('#sidebar');
 const sidebarOverlay = $('#sidebarOverlay');
-const convListEl = $('#conversationList');
 const settingsMenu = $('#settingsMenu');
 const toastContainer = $('#toastContainer');
 const statusBadge = $('#statusBadge');
@@ -38,9 +37,7 @@ async function saveToServer() {
 }
 
 async function deleteFromServer(id) {
-  try {
-    await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
-  } catch {}
+  try { await fetch(`/api/conversations/${id}`, { method: 'DELETE' }); } catch {}
 }
 
 async function loadFromServer() {
@@ -181,12 +178,13 @@ function updateLastAssistant(content, sources) {
 
 /* ─── Render ─── */
 function renderConversations() {
-  if (!convListEl) return;
+  const el = $('#sidebarConversations');
+  if (!el) return;
   if (state.conversations.length === 0) {
-    convListEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:13px;">لا توجد محادثات سابقة</div>`;
+    el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:13px;">لا توجد محادثات سابقة</div>`;
     return;
   }
-  convListEl.innerHTML = state.conversations
+  el.innerHTML = state.conversations
     .map(
       (c) => `
       <div class="conv-item ${c.id === state.currentId ? 'active' : ''}" onclick="switchConversation('${c.id}')">
@@ -208,9 +206,9 @@ function renderMessages() {
     renderEmptyState();
     return;
   }
-  conv.messages.forEach((msg) => {
-    if (msg.role === 'user') appendMessage(msg.content, 'user');
-    else appendMessage(msg.content, 'assistant', msg.sources);
+  conv.messages.forEach((msg, i) => {
+    if (msg.role === 'user') appendMessage(msg.content, 'user', null, i);
+    else appendMessage(msg.content, 'assistant', msg.sources, i);
   });
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -232,7 +230,7 @@ function renderEmptyState() {
     </div>`;
 }
 
-function appendMessage(text, role, sources) {
+function appendMessage(text, role, sources, msgIndex) {
   const div = document.createElement('div');
   div.className = `message ${role}`;
 
@@ -248,10 +246,18 @@ function appendMessage(text, role, sources) {
           📚 المصادر (${sources.length}) <span class="arrow">◀</span>
         </button>
         <div class="sources-list">
-          ${sources.map((s) => `<button class="source-chip">${escapeHtml(s.replace('.txt', ''))}</button>`).join('')}
+          ${sources.map((s) => `<button class="source-chip" onclick="viewSource('${escapeHtml(s)}')">${escapeHtml(s.replace('.txt', ''))}</button>`).join('')}
         </div>`;
       div.appendChild(srcDiv);
     }
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.className = 'feedback-buttons';
+    feedbackDiv.innerHTML = `
+      <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'up')" title="مفيد">👍</button>
+      <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'down')" title="غير مفيد">👎</button>
+      <button class="feedback-btn" onclick="saveAsKnowledge(${msgIndex})" title="حفظ كمعرفة">💾</button>
+    `;
+    div.appendChild(feedbackDiv);
   }
 
   messagesEl.appendChild(div);
@@ -259,11 +265,140 @@ function appendMessage(text, role, sources) {
   return div;
 }
 
+/* ─── Feedback & Knowledge ─── */
+async function sendFeedback(msgIndex, rating) {
+  const conv = getCurrentConv();
+  if (!conv) return;
+  try {
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId: conv.id, messageIndex: msgIndex, rating: rating === 'up' ? 1 : -1 }),
+    });
+    toast(rating === 'up' ? 'شكراً على تقييمك!' : 'شكراً، سنحسن الإجابة', 'success');
+  } catch {}
+}
+
+async function saveAsKnowledge(msgIndex) {
+  const conv = getCurrentConv();
+  if (!conv) return;
+  const msg = conv.messages[msgIndex];
+  if (!msg || msg.role !== 'assistant') return;
+  const prevMsg = conv.messages[msgIndex - 1];
+  const question = prevMsg?.role === 'user' ? prevMsg.content : 'سؤال غير معروف';
+  try {
+    await fetch('/api/knowledge/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, answer: msg.content, source: conv.title }),
+    });
+    toast('تم حفظ الإجابة كمعرفة جديدة!', 'success');
+  } catch {}
+}
+
+/* ─── Sidebar Tabs ─── */
+function switchSidebarTab(tab) {
+  $$('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  $$('.sidebar-content').forEach(el => el.style.display = 'none');
+  const target = tab === 'conversations' ? 'sidebarConversations' : tab === 'knowledge' ? 'sidebarKnowledge' : 'sidebarAdmin';
+  const el = document.getElementById(target);
+  if (el) {
+    el.style.display = 'flex';
+    if (tab === 'knowledge') renderKnowledgeTab();
+    if (tab === 'admin') renderAdminTab();
+  }
+}
+
+async function renderKnowledgeTab() {
+  const el = $('#sidebarKnowledge');
+  if (!el) return;
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-faint)">جاري تحميل المعرفة...</div>';
+  try {
+    const res = await fetch('/api/knowledge/sources');
+    const sources = await res.json();
+    if (sources.length === 0) {
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-faint)">لا توجد مصادر معرفة</div>';
+      return;
+    }
+    el.innerHTML = sources.map(s => `
+      <div class="knowledge-item">
+        <div class="knowledge-item-header">
+          <span class="knowledge-icon">📄</span>
+          <span class="knowledge-name">${escapeHtml(s.filename)}</span>
+        </div>
+        <div class="knowledge-item-details">
+          <span>${s.chunkCount || 0} مقطع</span>
+          <span>${s.size ? Math.round(s.size / 1024) + 'KB' : ''}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-faint)">خطأ في تحميل المعرفة</div>';
+  }
+}
+
+async function renderAdminTab() {
+  const el = $('#sidebarAdmin');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/knowledge/stats');
+    const data = await res.json();
+    el.innerHTML = `
+      <div class="admin-section">
+        <h3>إحصائيات المعرفة</h3>
+        <div class="stat-row"><span>إجمالي المقاطع</span><strong>${data.stats.totalChunks}</strong></div>
+        <div class="stat-row"><span>عدد المصادر</span><strong>${data.stats.totalSources}</strong></div>
+        <div class="stat-row"><span>آخر تحديث</span><strong>${data.stats.lastUpdated ? new Date(data.stats.lastUpdated).toLocaleDateString('ar-SA') : '-'}</strong></div>
+      </div>
+      <div class="admin-section">
+        <h3>الإجراءات</h3>
+        <button class="admin-btn" onclick="reingestKnowledge()">🔄 إعادة استيراد المعرفة</button>
+        <button class="admin-btn" onclick="loadQAKnowledge()">📝 عرض المعرفة المضافة</button>
+      </div>
+      <div class="admin-section" id="qaSection" style="display:none">
+        <h3>المعرفة المضافة من المحادثات</h3>
+        <div id="qaList"></div>
+      </div>
+    `;
+  } catch {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-faint)">خطأ في تحميل الإحصائيات</div>';
+  }
+}
+
+async function reingestKnowledge() {
+  try {
+    await fetch('/api/knowledge/ingest', { method: 'POST' });
+    toast('تم إعادة استيراد المعرفة بنجاح!', 'success');
+    switchSidebarTab('knowledge');
+  } catch {
+    toast('خطأ في إعادة الاستيراد', 'error');
+  }
+}
+
+async function loadQAKnowledge() {
+  const section = $('#qaSection');
+  const list = $('#qaList');
+  if (!section || !list) return;
+  section.style.display = 'block';
+  try {
+    const res = await fetch('/api/knowledge/qa');
+    const qa = await res.json();
+    if (qa.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-faint);font-size:13px;">لا توجد معرفة مضافة بعد</div>';
+      return;
+    }
+    list.innerHTML = qa.slice(-10).reverse().map(q => `
+      <div class="qa-item">
+        <div class="qa-question">س: ${escapeHtml(q.question.slice(0, 60))}</div>
+        <div class="qa-answer">ج: ${escapeHtml(q.answer.slice(0, 80))}...</div>
+      </div>
+    `).join('');
+  } catch {}
+}
+
 /* ─── Markdown ─── */
 function renderMarkdown(text) {
   let html = escapeHtml(text);
-
-  // Code blocks (must be before inline code)
   html = html.replace(/~~~(\w*)\n([\s\S]*?)~~~/g, (_, lang, code) => {
     const trimmed = code.replace(/&amp;/g, '&');
     return `<pre><button class="copy-btn" onclick="copyCode(this)">نسخ</button><code>${trimmed}</code></pre>`;
@@ -272,40 +407,21 @@ function renderMarkdown(text) {
     const trimmed = code.replace(/&amp;/g, '&');
     return `<pre><button class="copy-btn" onclick="copyCode(this)">نسخ</button><code>${trimmed}</code></pre>`;
   });
-
-  // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Bold
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-  // Lists: unordered (- or *)
   html = html.replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-
-  // Ordered lists
   html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, (match) => {
     if (!match.includes('<ul>')) return '<ol>' + match + '</ol>';
     return match;
   });
-
-  // Headings
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-
-  // Paragraphs (double newlines)
   html = html.replace(/\n\n/g, '</p><p>');
-
-  // Single newlines within paragraphs
   html = html.replace(/\n/g, '<br>');
-
-  // Wrap in paragraphs if not already wrapped
   if (!html.startsWith('<')) html = '<p>' + html + '</p>';
-
-  // Clean empty paragraphs
   html = html.replace(/<p><\/p>/g, '');
-
   return html;
 }
 
@@ -347,29 +463,35 @@ async function sendQuestion() {
     renderConversations();
   }
 
-  // Remove empty state and add user message
   const empty = messagesEl.querySelector('.empty-state');
   if (empty) empty.remove();
 
   addMessageToConv('user', question);
   appendMessage(question, 'user');
 
-  // Show typing indicator
   const msgDiv = document.createElement('div');
   msgDiv.className = 'message assistant';
   msgDiv.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
   messagesEl.appendChild(msgDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  // Global streaming state
   let answer = '';
   let sources = [];
 
   try {
+    const body = {
+      question,
+      conversationId: conv.id,
+      model: state.settings.model || 'groq',
+      useHyde: state.settings.useHyde || false,
+      useExpansion: state.settings.useExpansion || false,
+      useSelfRag: state.settings.useSelfRag || false,
+    };
+
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, conversationId: conv.id }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -385,16 +507,13 @@ async function sendQuestion() {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const data = line.slice(6);
         if (data === '[DONE]') continue;
-
         try {
           const parsed = JSON.parse(data);
           if (parsed.content) {
@@ -409,7 +528,6 @@ async function sendQuestion() {
       }
     }
 
-    // Remove cursor and render final
     msgDiv.innerHTML = renderMarkdown(answer);
 
     if (sources.length) {
@@ -420,10 +538,20 @@ async function sendQuestion() {
           📚 المصادر (${sources.length}) <span class="arrow">◀</span>
         </button>
         <div class="sources-list">
-          ${sources.map((s) => `<button class="source-chip">${escapeHtml(s.replace('.txt', ''))}</button>`).join('')}
+          ${sources.map((s) => `<button class="source-chip" onclick="viewSource('${escapeHtml(s)}')">${escapeHtml(s.replace('.txt', ''))}</button>`).join('')}
         </div>`;
       msgDiv.appendChild(srcDiv);
     }
+
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.className = 'feedback-buttons';
+    const msgIndex = conv.messages.length;
+    feedbackDiv.innerHTML = `
+      <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'up')" title="مفيد">👍</button>
+      <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'down')" title="غير مفيد">👎</button>
+      <button class="feedback-btn" onclick="saveAsKnowledge(${msgIndex})" title="حفظ كمعرفة">💾</button>
+    `;
+    msgDiv.appendChild(feedbackDiv);
 
     updateLastAssistant(answer, sources);
   } catch (err) {
@@ -486,6 +614,22 @@ function setFontSize(size) {
   });
 }
 
+function setModel(model) {
+  state.settings.model = model;
+  saveSettings();
+  $$('.toggle-group button[data-model]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.model === model);
+  });
+  toast(`تم التبديل إلى ${model === 'groq' ? 'Groq' : 'OpenAI'}`, 'success');
+}
+
+function saveRetrievalOptions() {
+  state.settings.useHyde = $('#useHyde').checked;
+  state.settings.useExpansion = $('#useExpansion').checked;
+  state.settings.useSelfRag = $('#useSelfRag').checked;
+  saveSettings();
+}
+
 function clearAllData() {
   showConfirm({
     title: 'حذف المحادثات',
@@ -516,7 +660,6 @@ const confirmModal = $('#confirmModal');
 const confirmTitle = $('#confirmTitle');
 const confirmMessage = $('#confirmMessage');
 const confirmBtn = $('#confirmBtn');
-
 let confirmCallback = null;
 
 function showConfirm({ title, message, confirmText, onConfirm }) {
@@ -576,11 +719,9 @@ function autoResize() {
 async function init() {
   loadSettings();
 
-  // Try server first, fallback to localStorage
   const loaded = await loadFromServer();
   if (!loaded) loadConversations();
 
-  // Restore currentId
   try {
     const savedId = localStorage.getItem(CURRENT_ID_KEY);
     if (savedId && state.conversations.find((c) => c.id === savedId)) {
@@ -594,11 +735,14 @@ async function init() {
   applyTheme();
   updateThemeUI();
   setFontSize(state.settings.fontSize);
+  if (state.settings.model) setModel(state.settings.model);
+  if (state.settings.useHyde) $('#useHyde').checked = true;
+  if (state.settings.useExpansion) $('#useExpansion').checked = true;
+  if (state.settings.useSelfRag) $('#useSelfRag').checked = true;
 
   renderConversations();
   renderMessages();
 
-  // Events
   sendBtn.addEventListener('click', sendQuestion);
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -608,7 +752,6 @@ async function init() {
   });
   inputEl.addEventListener('input', autoResize);
 
-  // System theme change listener
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (state.settings.theme === 'system') applyTheme();
   });

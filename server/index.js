@@ -4,12 +4,27 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { askQuestion } from "./chat.js";
+import { ingestAll } from "./ingest.js";
 import {
   readConversations,
   saveConversation,
   deleteConversation,
   getConversation,
 } from "../utils/conversations.js";
+import {
+  getStoreStats,
+  getKnowledgeIndex,
+  addToKnowledgeIndex,
+  removeFromKnowledgeIndex,
+  deleteBySource,
+  addFeedback,
+  getFeedback,
+  addQAKnowledge,
+  getQAKnowledge,
+} from "../utils/store.js";
+import { chunkText } from "../utils/chunker.js";
+import { generateEmbeddings } from "../utils/embed.js";
+import { addChunks } from "../utils/store.js";
 
 dotenv.config();
 
@@ -18,11 +33,28 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// In-memory history for multi-turn context (loaded on demand)
 const historyCache = new Map();
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000;
+const RATE_LIMIT_MAX = 30;
+
+function rateLimit(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  if (!rateLimitMap.has(ip)) {
+    rateLimitMap.set(ip, []);
+  }
+  const timestamps = rateLimitMap.get(ip).filter(t => now - t < RATE_LIMIT_WINDOW);
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    return res.status(429).json({ error: "طلبات كثيرة جداً. الرجاء الانتظار قليلاً." });
+  }
+  timestamps.push(now);
+  rateLimitMap.set(ip, timestamps);
+  next();
+}
 
 async function loadHistory(convId) {
   if (historyCache.has(convId)) return historyCache.get(convId);
@@ -38,7 +70,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.post("/api/chat", async (req, res) => {
-  const { question, conversationId } = req.body;
+  const { question, conversationId, model = "groq", useHyde = false, useExpansion = false, useSelfRag = false } = req.body;
   if (!question) return res.status(400).json({ error: "No question provided" });
 
   const convId = conversationId || crypto.randomUUID();
@@ -47,7 +79,7 @@ app.post("/api/chat", async (req, res) => {
   history.push({ role: "user", content: question });
 
   try {
-    const { stream, sources, noContext } = await askQuestion(question, history);
+    const { stream, sources, noContext } = await askQuestion(question, history, { model, useHyde, useExpansion, useSelfRag });
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -90,7 +122,6 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-// Save full conversation from client
 app.post("/api/conversations", async (req, res) => {
   try {
     const conv = req.body;
@@ -103,7 +134,6 @@ app.post("/api/conversations", async (req, res) => {
   }
 });
 
-// List all conversations (summary only)
 app.get("/api/conversations", async (req, res) => {
   try {
     const all = await readConversations();
@@ -121,7 +151,6 @@ app.get("/api/conversations", async (req, res) => {
   }
 });
 
-// Get single conversation
 app.get("/api/conversations/:id", async (req, res) => {
   try {
     const conv = await getConversation(req.params.id);
@@ -132,12 +161,93 @@ app.get("/api/conversations/:id", async (req, res) => {
   }
 });
 
-// Delete conversation
 app.delete("/api/conversations/:id", async (req, res) => {
   try {
     await deleteConversation(req.params.id);
     historyCache.delete(req.params.id);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/knowledge/stats", async (req, res) => {
+  try {
+    const stats = await getStoreStats();
+    const index = await getKnowledgeIndex();
+    res.json({ stats, index });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/knowledge/sources", async (req, res) => {
+  try {
+    const index = await getKnowledgeIndex();
+    res.json(index);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/knowledge/ingest", async (req, res) => {
+  try {
+    const total = await ingestAll();
+    res.json({ ok: true, totalChunks: total });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/knowledge/delete", async (req, res) => {
+  try {
+    const { source } = req.body;
+    if (!source) return res.status(400).json({ error: "Source required" });
+    await deleteBySource(source);
+    await removeFromKnowledgeIndex(source);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/feedback", async (req, res) => {
+  try {
+    const { conversationId, messageIndex, rating, comment } = req.body;
+    if (!conversationId || rating === undefined) {
+      return res.status(400).json({ error: "conversationId and rating required" });
+    }
+    await addFeedback({ conversationId, messageIndex, rating, comment });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/knowledge/qa", async (req, res) => {
+  try {
+    const { question, answer, source } = req.body;
+    if (!question || !answer) return res.status(400).json({ error: "Question and answer required" });
+    await addQAKnowledge({ question, answer, source: source || "user_qa" });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/knowledge/qa", async (req, res) => {
+  try {
+    const qa = await getQAKnowledge();
+    res.json(qa);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/feedback", async (req, res) => {
+  try {
+    const feedback = await getFeedback();
+    res.json(feedback);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

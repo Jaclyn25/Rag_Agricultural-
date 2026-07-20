@@ -21,7 +21,14 @@
       </div>
       <button class="new-chat-btn" onclick="newChat()">+ محادثة جديدة</button>
     </div>
-    <div class="conversations" id="conversationList"></div>
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" data-tab="conversations" onclick="switchSidebarTab('conversations')">💬 المحادثات</button>
+      <button class="sidebar-tab" data-tab="knowledge" onclick="switchSidebarTab('knowledge')">📚 المعرفة</button>
+      <button class="sidebar-tab" data-tab="admin" onclick="switchSidebarTab('admin')">⚙️ الإدارة</button>
+    </div>
+    <div class="sidebar-content" id="sidebarConversations"></div>
+    <div class="sidebar-content" id="sidebarKnowledge" style="display:none"></div>
+    <div class="sidebar-content" id="sidebarAdmin" style="display:none"></div>
     <div class="sidebar-footer">
       <button onclick="toggleTheme()" title="التبديل بين الوضع الداكن والفاتح">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -55,28 +62,42 @@
           <button class="icon-btn" onclick="toggleSettingsMenu()" title="الإعدادات">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-          </button>
-          <div class="settings-menu" id="settingsMenu">
-            <div class="settings-group">
-              <label>المظهر</label>
-              <div class="toggle-group">
-                <button data-theme="dark" onclick="setTheme('dark')">داكن</button>
-                <button data-theme="light" onclick="setTheme('light')">فاتح</button>
-                <button data-theme="system" onclick="setTheme('system')">النظام</button>
-              </div>
+          </svg>
+        </button>
+        <div class="settings-menu" id="settingsMenu">
+          <div class="settings-group">
+            <label>المظهر</label>
+            <div class="toggle-group">
+              <button data-theme="dark" onclick="setTheme('dark')">داكن</button>
+              <button data-theme="light" onclick="setTheme('light')">فاتح</button>
+              <button data-theme="system" onclick="setTheme('system')">النظام</button>
             </div>
-            <div class="settings-group">
-              <label>حجم الخط</label>
-              <div class="toggle-group">
-                <button data-size="small" onclick="setFontSize('small')">صغير</button>
-                <button data-size="medium" onclick="setFontSize('medium')">متوسط</button>
-                <button data-size="large" onclick="setFontSize('large')">كبير</button>
-              </div>
+          </div>
+          <div class="settings-group">
+            <label>حجم الخط</label>
+            <div class="toggle-group">
+              <button data-size="small" onclick="setFontSize('small')">صغير</button>
+              <button data-size="medium" onclick="setFontSize('medium')">متوسط</button>
+              <button data-size="large" onclick="setFontSize('large')">كبير</button>
             </div>
-            <div class="settings-group">
-              <button class="btn-danger" onclick="clearAllData()">حذف جميع المحادثات</button>
+          </div>
+          <div class="settings-group">
+            <label>نموذج الذكاء الاصطناعي</label>
+            <div class="toggle-group">
+              <button data-model="groq" onclick="setModel('groq')">Groq</button>
+              <button data-model="openai" onclick="setModel('openai')">OpenAI</button>
             </div>
+          </div>
+          <div class="settings-group">
+            <label>تحسينات البحث</label>
+            <div class="checkbox-group">
+              <label class="checkbox-label"><input type="checkbox" id="useHyde" onchange="saveRetrievalOptions()"> HyDE (توليد افتراضي)</label>
+              <label class="checkbox-label"><input type="checkbox" id="useExpansion" onchange="saveRetrievalOptions()"> توسيع الاستعلام</label>
+              <label class="checkbox-label"><input type="checkbox" id="useSelfRag" onchange="saveRetrievalOptions()"> Self-RAG</label>
+            </div>
+          </div>
+          <div class="settings-group">
+            <button class="btn-danger" onclick="clearAllData()">حذف جميع المحادثات</button>
           </div>
         </div>
       </div>

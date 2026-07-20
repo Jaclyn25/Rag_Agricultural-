@@ -7,9 +7,7 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "conversations.json");
 
 async function ensureDataDir() {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch {}
+  try { await fs.mkdir(DATA_DIR, { recursive: true }); } catch {}
 }
 
 export async function readConversations() {
@@ -47,4 +45,14 @@ export async function deleteConversation(id) {
 export async function getConversation(id) {
   const all = await readConversations();
   return all.find((c) => c.id === id) || null;
+}
+
+export async function getConversationsByDateRange(start, end) {
+  const all = await readConversations();
+  return all.filter(c => c.createdAt >= start && c.createdAt <= end);
+}
+
+export async function getConversationsWithFeedback() {
+  const all = await readConversations();
+  return all.filter(c => c.messages && c.messages.some(m => m.feedback));
 }
