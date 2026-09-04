@@ -9,6 +9,18 @@ const state = {
 const CONV_KEY = 'zeraea_conversations';
 const SETTINGS_KEY = 'zeraea_settings';
 const CURRENT_ID_KEY = 'zeraea_current_id';
+const ADMIN_TOKEN_KEY = 'zeraea_admin_token';
+
+function getAdminToken() {
+  return sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
+}
+
+function adminFetch(url, opts = {}) {
+  const token = getAdminToken();
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['X-Admin-Token'] = token;
+  return fetch(url, { ...opts, headers });
+}
 
 /* ─── DOM Refs ─── */
 const $ = (s) => document.querySelector(s);
@@ -28,25 +40,34 @@ async function saveToServer() {
   const conv = getCurrentConv();
   if (!conv) return;
   try {
-    await fetch('/api/conversations', {
+    const res = await fetch('/api/conversations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(conv),
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.writeToken && conv.writeToken !== data.writeToken) {
+        conv.writeToken = data.writeToken;
+        saveConversations();
+      }
+    }
   } catch {}
 }
 
 async function deleteFromServer(id) {
-  try { await fetch(`/api/conversations/${id}`, { method: 'DELETE' }); } catch {}
+  try { await adminFetch(`/api/conversations/${id}`, { method: 'DELETE' }); } catch {}
 }
 
 async function loadFromServer() {
   try {
-    const res = await fetch('/api/conversations');
+    const res = await adminFetch('/api/conversations');
+    if (res.status === 401) return false;
     const summaries = await res.json();
     const fullConvs = [];
     for (const s of summaries) {
-      const r2 = await fetch(`/api/conversations/${s.id}`);
+      const r2 = await adminFetch(`/api/conversations/${s.id}`);
+      if (r2.status === 401) return false;
       const conv = await r2.json();
       if (conv && conv.messages) fullConvs.push(conv);
     }
@@ -287,12 +308,15 @@ async function saveAsKnowledge(msgIndex) {
   const prevMsg = conv.messages[msgIndex - 1];
   const question = prevMsg?.role === 'user' ? prevMsg.content : 'سؤال غير معروف';
   try {
-    await fetch('/api/knowledge/qa', {
+    const res = await adminFetch('/api/knowledge/qa', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, answer: msg.content, source: conv.title }),
+      body: JSON.stringify({ question, answer: msg.content }),
     });
-    toast('تم حفظ الإجابة كمعرفة جديدة!', 'success');
+    if (res.status === 401) { toast('رمز الإدارة مطلوب', 'error'); return; }
+    const data = await res.json();
+    if (data.created) toast('تم حفظ الإجابة كمعرفة جديدة!', 'success');
+    else toast('هذه الإجابة محفوظة مسبقاً', '');
   } catch {}
 }
 
@@ -351,6 +375,11 @@ async function renderAdminTab() {
 
     el.innerHTML = `
       <div class="admin-section">
+        <h3>رمز الإدارة</h3>
+        <input id="adminTokenInput" type="password" placeholder="ADMIN_TOKEN" value="${escapeHtml(getAdminToken())}" style="width:100%;padding:6px;margin-bottom:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text)">
+        <button class="admin-btn" onclick="saveAdminToken()">💾 حفظ الرمز</button>
+      </div>
+      <div class="admin-section">
         <h3>إحصائيات المعرفة</h3>
         <div class="stat-row"><span>إجمالي المقاطع</span><strong>${data.stats.totalChunks}</strong></div>
         <div class="stat-row"><span>عدد المصادر</span><strong>${data.stats.totalSources}</strong></div>
@@ -385,7 +414,8 @@ async function renderAdminTab() {
 
 async function runEval() {
   try {
-    await fetch('/api/eval/run', { method: 'POST' });
+    const res = await adminFetch('/api/eval/run', { method: 'POST' });
+    if (res.status === 401) { toast('رمز الإدارة مطلوب', 'error'); return; }
     toast('جاري تشغيل التقييم... قد يستغرق دقيقة', '');
     setTimeout(() => renderAdminTab(), 2000);
   } catch {
@@ -395,7 +425,8 @@ async function runEval() {
 
 async function reembedAll() {
   try {
-    await fetch('/api/knowledge/reembed', { method: 'POST' });
+    const res = await adminFetch('/api/knowledge/reembed', { method: 'POST' });
+    if (res.status === 401) { toast('رمز الإدارة مطلوب', 'error'); return; }
     toast('تم إعادة تضمين كل المعرفة!', 'success');
   } catch {
     toast('خطأ في إعادة التضمين', 'error');
@@ -404,7 +435,8 @@ async function reembedAll() {
 
 async function reingestKnowledge() {
   try {
-    await fetch('/api/knowledge/ingest', { method: 'POST' });
+    const res = await adminFetch('/api/knowledge/ingest', { method: 'POST' });
+    if (res.status === 401) { toast('رمز الإدارة مطلوب', 'error'); return; }
     toast('تم إعادة استيراد المعرفة بنجاح!', 'success');
     switchSidebarTab('knowledge');
   } catch {
@@ -418,7 +450,8 @@ async function loadQAKnowledge() {
   if (!section || !list) return;
   section.style.display = 'block';
   try {
-    const res = await fetch('/api/knowledge/qa');
+    const res = await adminFetch('/api/knowledge/qa');
+    if (res.status === 401) { toast('رمز الإدارة مطلوب', 'error'); return; }
     const qa = await res.json();
     if (qa.length === 0) {
       list.innerHTML = '<div style="color:var(--text-faint);font-size:13px;">لا توجد معرفة مضافة بعد</div>';
@@ -431,6 +464,48 @@ async function loadQAKnowledge() {
       </div>
     `).join('');
   } catch {}
+}
+
+function saveAdminToken() {
+  const input = $('#adminTokenInput');
+  if (!input) return;
+  const value = input.value.trim();
+  if (value) sessionStorage.setItem(ADMIN_TOKEN_KEY, value);
+  else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  toast('تم حفظ رمز الإدارة', 'success');
+}
+
+async function viewSource(name) {
+  try {
+    const res = await fetch(`/api/knowledge/source/${encodeURIComponent(name)}`);
+    if (!res.ok) { toast('تعذر تحميل المصدر', 'error'); return; }
+    const data = await res.json();
+    const content = (data.chunks || []).map(c => `<p>${escapeHtml(c.text)}</p>`).join('');
+    showSourceModal(name.replace(/\.(txt|md|html|json)$/i, ''), content);
+  } catch {
+    toast('تعذر تحميل المصدر', 'error');
+  }
+}
+
+function showSourceModal(title, bodyHtml) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.id = 'sourceOverlay';
+  overlay.onclick = closeSourceModal;
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-icon">📄</div>
+    <h3 class="modal-title">${escapeHtml(title)}</h3>
+    <div class="modal-message source-body">${bodyHtml}</div>
+    <button class="modal-btn modal-btn-cancel" onclick="closeSourceModal()">إغلاق</button>`;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+function closeSourceModal() {
+  const el = document.getElementById('sourceOverlay');
+  if (el) el.remove();
 }
 
 /* ─── Markdown ─── */
