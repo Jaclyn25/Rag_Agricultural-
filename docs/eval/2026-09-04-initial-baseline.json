@@ -1,0 +1,161 @@
+{
+  "best": {
+    "alpha": 0.3,
+    "topK": 3,
+    "config": "BM25-heavy",
+    "avgRecall": 61.7,
+    "avgPrecision": 34.2,
+    "avgF1": 44,
+    "avgKeywordMatch": 61.3,
+    "passRate": 75,
+    "passes": 15,
+    "fails": 5
+  },
+  "all": [
+    {
+      "alpha": 0.3,
+      "topK": 3,
+      "config": "BM25-heavy",
+      "avgRecall": 61.7,
+      "avgPrecision": 34.2,
+      "avgF1": 44,
+      "avgKeywordMatch": 61.3,
+      "passRate": 75,
+      "passes": 15,
+      "fails": 5
+    },
+    {
+      "alpha": 0.5,
+      "topK": 3,
+      "config": "Balanced",
+      "avgRecall": 59.2,
+      "avgPrecision": 35,
+      "avgF1": 44,
+      "avgKeywordMatch": 60,
+      "passRate": 70,
+      "passes": 14,
+      "fails": 6
+    },
+    {
+      "alpha": 0.3,
+      "topK": 5,
+      "config": "BM25-heavy",
+      "avgRecall": 64.2,
+      "avgPrecision": 25.4,
+      "avgF1": 36.4,
+      "avgKeywordMatch": 70.4,
+      "passRate": 75,
+      "passes": 15,
+      "fails": 5
+    },
+    {
+      "alpha": 0.5,
+      "topK": 5,
+      "config": "Balanced",
+      "avgRecall": 60.8,
+      "avgPrecision": 23,
+      "avgF1": 33.4,
+      "avgKeywordMatch": 69.2,
+      "passRate": 70,
+      "passes": 14,
+      "fails": 6
+    },
+    {
+      "alpha": 0.3,
+      "topK": 10,
+      "config": "BM25-heavy",
+      "avgRecall": 90.8,
+      "avgPrecision": 18.4,
+      "avgF1": 30.6,
+      "avgKeywordMatch": 83.3,
+      "passRate": 100,
+      "passes": 20,
+      "fails": 0
+    },
+    {
+      "alpha": 0.5,
+      "topK": 10,
+      "config": "Balanced",
+      "avgRecall": 90.8,
+      "avgPrecision": 17.8,
+      "avgF1": 29.7,
+      "avgKeywordMatch": 80.8,
+      "passRate": 100,
+      "passes": 20,
+      "fails": 0
+    },
+    {
+      "alpha": 0.7,
+      "topK": 3,
+      "config": "Dense-heavy",
+      "avgRecall": 47.5,
+      "avgPrecision": 19.2,
+      "avgF1": 27.3,
+      "avgKeywordMatch": 30,
+      "passRate": 55,
+      "passes": 11,
+      "fails": 9
+    },
+    {
+      "alpha": 0.7,
+      "topK": 5,
+      "config": "Dense-heavy",
+      "avgRecall": 55,
+      "avgPrecision": 13.7,
+      "avgF1": 21.9,
+      "avgKeywordMatch": 37.1,
+      "passRate": 60,
+      "passes": 12,
+      "fails": 8
+    },
+    {
+      "alpha": 0.7,
+      "topK": 10,
+      "config": "Dense-heavy",
+      "avgRecall": 72.5,
+      "avgPrecision": 10.4,
+      "avgF1": 18.1,
+      "avgKeywordMatch": 52.1,
+      "passRate": 80,
+      "passes": 16,
+      "fails": 4
+    },
+    {
+      "alpha": 1,
+      "topK": 3,
+      "config": "Dense-only",
+      "avgRecall": 32.5,
+      "avgPrecision": 11.7,
+      "avgF1": 17.2,
+      "avgKeywordMatch": 15.8,
+      "passRate": 35,
+      "passes": 7,
+      "fails": 13
+    },
+    {
+      "alpha": 1,
+      "topK": 5,
+      "config": "Dense-only",
+      "avgRecall": 44.2,
+      "avgPrecision": 10,
+      "avgF1": 16.3,
+      "avgKeywordMatch": 19.6,
+      "passRate": 50,
+      "passes": 10,
+      "fails": 10
+    },
+    {
+      "alpha": 1,
+      "topK": 10,
+      "config": "Dense-only",
+      "avgRecall": 55.8,
+      "avgPrecision": 7.2,
+      "avgF1": 12.8,
+      "avgKeywordMatch": 34.6,
+      "passRate": 65,
+      "passes": 13,
+      "fails": 7
+    }
+  ],
+  "timestamp": 1788536827660
+}
