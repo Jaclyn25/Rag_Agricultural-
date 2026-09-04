@@ -1,34 +1,15 @@
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { updateJsonFile, atomicWriteFile } from "./jsonfile.js";
+import { tokenize } from "./text.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_DIR = process.env.ZERAEH_DATA_DIR || path.join(__dirname, "..", "data");
 const VECTORS_FILE = path.join(DATA_DIR, "vectors.json");
 const KNOWLEDGE_INDEX_FILE = path.join(DATA_DIR, "knowledge_index.json");
 const FEEDBACK_FILE = path.join(DATA_DIR, "feedback.json");
 const QA_KNOWLEDGE_FILE = path.join(DATA_DIR, "qa_knowledge.json");
-
-async function ensureDataDir() {
-  try { await fs.mkdir(DATA_DIR, { recursive: true }); } catch {}
-}
-
-const STOP_WORDS_AR = [
-  "في", "من", "إلى", "عن", "على", "مع", "كان", "هذا", "هذه", "ذلك",
-  "تلك", "هو", "هي", "هم", "هن", "و", "ف", "ب", "ل", "ك", "لا", "ما",
-  "لم", "لن", "إن", "أن", "قد", "كل", "بعض", "أو", "ثم", "حتى", "إذا",
-  "عند", "بين", "تحت", "فوق", "خلال", "دون", "وال", "ال", "التي", "الذي",
-  "الذين", "اللذان", "اللواتي", "به", "لها", "لهم", "له", "منها", "منهم",
-  "عليها", "عليهم", "فيها", "فيهم", "وقد", "ولم", "ولا", "ومن", "عليه"
-];
-
-function tokenize(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^\u0600-\u06FF\w\s]/g, " ")
-    .split(/\s+/)
-    .filter(t => t.length > 1 && !STOP_WORDS_AR.includes(t));
-}
 
 function buildInvertedIndex(store) {
   const index = {};
@@ -78,12 +59,10 @@ export async function readStore() {
 }
 
 export async function writeStore(data) {
-  await ensureDataDir();
-  await fs.writeFile(VECTORS_FILE, JSON.stringify(data, null, 2));
+  await atomicWriteFile(VECTORS_FILE, data);
 }
 
 export async function addChunks(chunks, embeddings, metadata = {}) {
-  const store = await readStore();
   const entries = chunks.map((chunk, i) => ({
     id: crypto.randomUUID(),
     text: chunk.text,
@@ -95,8 +74,10 @@ export async function addChunks(chunks, embeddings, metadata = {}) {
     ingestedAt: Date.now(),
     tags: chunk.tags || metadata.tags || [],
   }));
-  store.push(...entries);
-  await writeStore(store);
+  await updateJsonFile(VECTORS_FILE, [], (store) => {
+    store.push(...entries);
+    return store;
+  });
   return entries.length;
 }
 
@@ -150,15 +131,11 @@ export async function searchSimilar(queryEmbedding, topK = 5, queryText = "", al
 }
 
 export async function deleteChunk(id) {
-  const store = await readStore();
-  const filtered = store.filter(e => e.id !== id);
-  await writeStore(filtered);
+  await updateJsonFile(VECTORS_FILE, [], (store) => store.filter(e => e.id !== id));
 }
 
 export async function deleteBySource(source) {
-  const store = await readStore();
-  const filtered = store.filter(e => e.source !== source);
-  await writeStore(filtered);
+  await updateJsonFile(VECTORS_FILE, [], (store) => store.filter(e => e.source !== source));
 }
 
 export async function getStoreStats() {
@@ -185,25 +162,23 @@ export async function getKnowledgeIndex() {
 }
 
 export async function saveKnowledgeIndex(index) {
-  await ensureDataDir();
-  await fs.writeFile(KNOWLEDGE_INDEX_FILE, JSON.stringify(index, null, 2));
+  await atomicWriteFile(KNOWLEDGE_INDEX_FILE, index);
 }
 
 export async function addToKnowledgeIndex(entry) {
-  const index = await getKnowledgeIndex();
-  const existing = index.findIndex(e => e.filename === entry.filename);
-  if (existing >= 0) {
-    index[existing] = { ...index[existing], ...entry, updatedAt: Date.now() };
-  } else {
-    index.push({ ...entry, addedAt: Date.now(), updatedAt: Date.now() });
-  }
-  await saveKnowledgeIndex(index);
+  await updateJsonFile(KNOWLEDGE_INDEX_FILE, [], (index) => {
+    const existing = index.findIndex(e => e.filename === entry.filename);
+    if (existing >= 0) {
+      index[existing] = { ...index[existing], ...entry, updatedAt: Date.now() };
+    } else {
+      index.push({ ...entry, addedAt: Date.now(), updatedAt: Date.now() });
+    }
+    return index;
+  });
 }
 
 export async function removeFromKnowledgeIndex(filename) {
-  const index = await getKnowledgeIndex();
-  const filtered = index.filter(e => e.filename !== filename);
-  await saveKnowledgeIndex(filtered);
+  await updateJsonFile(KNOWLEDGE_INDEX_FILE, [], (index) => index.filter(e => e.filename !== filename));
 }
 
 export async function getFeedback() {
@@ -216,14 +191,14 @@ export async function getFeedback() {
 }
 
 export async function saveFeedback(feedback) {
-  await ensureDataDir();
-  await fs.writeFile(FEEDBACK_FILE, JSON.stringify(feedback, null, 2));
+  await atomicWriteFile(FEEDBACK_FILE, feedback);
 }
 
 export async function addFeedback(entry) {
-  const all = await getFeedback();
-  all.push({ ...entry, timestamp: Date.now() });
-  await saveFeedback(all);
+  await updateJsonFile(FEEDBACK_FILE, [], (all) => {
+    all.push({ ...entry, timestamp: Date.now() });
+    return all;
+  });
 }
 
 export async function getQAKnowledge() {
@@ -236,14 +211,35 @@ export async function getQAKnowledge() {
 }
 
 export async function saveQAKnowledge(data) {
-  await ensureDataDir();
-  await fs.writeFile(QA_KNOWLEDGE_FILE, JSON.stringify(data, null, 2));
+  await atomicWriteFile(QA_KNOWLEDGE_FILE, data);
 }
 
 export async function addQAKnowledge(entry) {
-  const all = await getQAKnowledge();
-  all.push({ ...entry, id: crypto.randomUUID(), addedAt: Date.now() });
-  await saveQAKnowledge(all);
+  const current = await getQAKnowledge();
+  const existing = current.find(e => e.question === entry.question && e.answer === entry.answer);
+  if (existing) return { entry: existing, created: false };
+  const newEntry = {
+    ...entry,
+    id: crypto.randomUUID(),
+    sourceType: "admin_qa",
+    provenance: "user_qa",
+    approved: true,
+    createdAt: Date.now(),
+    addedAt: Date.now(),
+  };
+  await updateJsonFile(QA_KNOWLEDGE_FILE, [], (all) => {
+    all.push(newEntry);
+    return all;
+  });
+  return { entry: newEntry, created: true };
+}
+
+export async function deleteQAKnowledge(id) {
+  await updateJsonFile(QA_KNOWLEDGE_FILE, [], (all) => all.filter(e => e.id !== id));
+}
+
+export async function deleteChunksByTag(tag) {
+  await updateJsonFile(VECTORS_FILE, [], (store) => store.filter(e => !(e.tags || []).includes(tag)));
 }
 
 export async function getStoreBySource(source) {

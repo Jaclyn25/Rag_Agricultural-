@@ -1,21 +1,27 @@
 import { pipeline } from "@xenova/transformers";
-import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createHash } from "node:crypto";
+import { updateJsonFile, readJson } from "./jsonfile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CACHE_DIR = path.join(__dirname, "..", "data", "embed_cache");
+const DATA_DIR = process.env.ZERAEH_DATA_DIR || path.join(__dirname, "..", "data");
+const CACHE_DIR = path.join(DATA_DIR, "embed_cache");
 const CACHE_FILE = path.join(CACHE_DIR, "cache.json");
+const EMBEDDING_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
 
 let extractor = null;
 let embedCache = null;
-let cacheDirty = false;
 
 async function getExtractor() {
   if (!extractor) {
-    extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    extractor = await pipeline("feature-extraction", EMBEDDING_MODEL_ID);
   }
   return extractor;
+}
+
+export function buildCacheKey(text, modelId = EMBEDDING_MODEL_ID) {
+  return createHash("sha256").update(`${modelId}\n${text}`).digest("hex");
 }
 
 function meanPooling(output) {
@@ -37,38 +43,22 @@ function normalize(vec) {
 
 async function loadCache() {
   if (embedCache !== null) return;
-  try {
-    const raw = await fs.readFile(CACHE_FILE, "utf-8");
-    embedCache = JSON.parse(raw);
-  } catch {
-    embedCache = {};
-  }
-}
-
-async function saveCache() {
-  if (!cacheDirty) return;
-  try {
-    await fs.mkdir(CACHE_DIR, { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(embedCache));
-    cacheDirty = false;
-  } catch {}
-}
-
-function getCacheKey(text) {
-  return text.slice(0, 100) + ":" + text.length;
+  embedCache = await readJson(CACHE_FILE, {});
 }
 
 export async function generateEmbedding(text) {
   await loadCache();
-  const key = getCacheKey(text);
+  const key = buildCacheKey(text);
   if (embedCache[key]) return embedCache[key];
 
   const ext = await getExtractor();
   const output = await ext(text, { pooling: "none", normalize: false });
   const vec = normalize(meanPooling(output));
   embedCache[key] = vec;
-  cacheDirty = true;
-  saveCache();
+  await updateJsonFile(CACHE_FILE, {}, (cache) => {
+    cache[key] = vec;
+    return cache;
+  });
   return vec;
 }
 
