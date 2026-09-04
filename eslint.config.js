@@ -16,6 +16,11 @@ export default [
         Response: "readonly",
         Headers: "readonly",
         Request: "readonly",
+        AbortController: "readonly",
+        AbortSignal: "readonly",
+        Buffer: "readonly",
+        URL: "readonly",
+        TextDecoder: "readonly",
       },
     },
     rules: {
@@ -25,6 +30,22 @@ export default [
       "no-var": "error",
       "eqeqeq": ["warn", "always"],
       "no-console": "off",
+    },
+  },
+  {
+    files: ["public/**/*.js"],
+    languageOptions: {
+      globals: {
+        document: "readonly",
+        window: "readonly",
+        localStorage: "readonly",
+        sessionStorage: "readonly",
+        navigator: "readonly",
+        TextDecoder: "readonly",
+      },
+    },
+    rules: {
+      "no-unused-vars": "off",
     },
   },
 ];
