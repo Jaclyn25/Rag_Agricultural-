@@ -23,7 +23,9 @@ jobs:
 
       - name: Run lint
         run: npx eslint --no-error-on-unmatched-pattern "**/*.js"
-        continue-on-error: true
+
+      - name: Run tests
+        run: npm test
 
   ingest:
     name: Knowledge Ingestion
