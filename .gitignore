@@ -1,6 +1,8 @@
 node_modules/
 .env
-data/
+data/conversations.json
+data/feedback.json
+data/qa_knowledge.json
 *.log
 .DS_Store
 Thumbs.db

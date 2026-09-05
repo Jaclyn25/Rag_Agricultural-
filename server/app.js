@@ -34,14 +34,18 @@ app.use((req, res, next) => {
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || null;
 const LOCAL_DEV_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-app.use(cors({
-  origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) return cb(null, true);
-    if (!ALLOWED_ORIGIN && LOCAL_DEV_ORIGIN.test(origin)) return cb(null, true);
-    return cb(null, false);
-  },
-}));
+app.use((req, res, next) => {
+  cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true);
+      const host = req.headers.host || "";
+      if (origin === `https://${host}` || origin === `http://${host}`) return cb(null, true);
+      if (ALLOWED_ORIGIN && origin === ALLOWED_ORIGIN) return cb(null, true);
+      if (!ALLOWED_ORIGIN && LOCAL_DEV_ORIGIN.test(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+  })(req, res, next);
+});
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
@@ -126,6 +130,10 @@ function assignExperiment() {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+});
+
+app.get("/api/admin/verify", requireAdmin, (req, res) => {
+  res.json({ ok: true });
 });
 
 app.post("/api/chat", rateLimitMW, async (req, res) => {
