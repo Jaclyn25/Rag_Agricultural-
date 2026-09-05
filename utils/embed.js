@@ -1,4 +1,4 @@
-import { pipeline, env } from "@xenova/transformers";
+import { pipeline } from "@xenova/transformers";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createHash } from "node:crypto";
@@ -9,10 +9,6 @@ const DATA_DIR = process.env.ZERAEH_DATA_DIR || path.join(__dirname, "..", "data
 const CACHE_DIR = path.join(DATA_DIR, "embed_cache");
 const CACHE_FILE = path.join(CACHE_DIR, "cache.json");
 const EMBEDDING_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
-
-if (process.env.VERCEL) {
-  env.cacheDir = "/tmp/hf-cache";
-}
 
 let extractor = null;
 let embedCache = null;
