@@ -87,25 +87,40 @@ test('S1: protected routes accept correct token', async () => {
   assert.ok(Array.isArray(await res.json()));
 });
 
-test('S1: feedback requires token and validates rating', async () => {
+test('S1: feedback is public but validates rating', async () => {
   const noToken = await fetch(`${base}/api/feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conversationId: 'c1', messageIndex: 0, rating: 1 }),
   });
-  assert.equal(noToken.status, 401);
+  assert.equal(noToken.status, 200, 'feedback must be accepted without admin token');
 
   const badRating = await fetch(`${base}/api/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'test-admin-token-123' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conversationId: 'c1', messageIndex: 0, rating: 5 }),
   });
   assert.equal(badRating.status, 400);
 
-  const ok = await fetch(`${base}/api/feedback`, {
+  const missingConv = await fetch(`${base}/api/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'test-admin-token-123' },
-    body: JSON.stringify({ conversationId: 'c1', messageIndex: 0, rating: 1 }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageIndex: 0, rating: 1 }),
+  });
+  assert.equal(missingConv.status, 400);
+});
+
+test('S1: admin verify rejects missing/wrong token and accepts correct token', async () => {
+  const missing = await fetch(`${base}/api/admin/verify`);
+  assert.equal(missing.status, 401);
+
+  const wrong = await fetch(`${base}/api/admin/verify`, {
+    headers: { 'X-Admin-Token': 'wrong-token' },
+  });
+  assert.equal(wrong.status, 401);
+
+  const ok = await fetch(`${base}/api/admin/verify`, {
+    headers: { 'X-Admin-Token': 'test-admin-token-123' },
   });
   assert.equal(ok.status, 200);
 });

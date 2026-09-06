@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 
 const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'zeraea-conv-'));
 process.env.ZERAEH_DATA_DIR = tmpDir;
+process.env.ADMIN_TOKEN = 'test-admin-token-123';
 
 const { app } = await import('../server/app.js');
 const conversations = await import('../utils/conversations.js');
@@ -110,4 +111,48 @@ test('GROUP0: one arbitrary request cannot overwrite an unrelated existing conve
   assert.equal(victim.title, 'محادثة');
   assert.equal(victim.messages[0].content, 'سؤال');
   assert.equal(bodyA.writeToken, victim.writeToken, 'victim write token must remain unchanged');
+});
+
+test('GROUP0: deleting without a write token is rejected (403)', async () => {
+  const res = await postConv(makeConv('conv-del-no-token'));
+  assert.equal(res.status, 200);
+
+  const attempt = await fetch(`${base}/api/conversations/conv-del-no-token`, { method: 'DELETE' });
+  assert.equal(attempt.status, 403);
+});
+
+test('GROUP0: deleting with the wrong write token is rejected (403)', async () => {
+  const res = await postConv(makeConv('conv-del-wrong'));
+  assert.equal(res.status, 200);
+
+  const attempt = await fetch(`${base}/api/conversations/conv-del-wrong`, {
+    method: 'DELETE',
+    headers: { 'X-Write-Token': 'wrong-token' },
+  });
+  assert.equal(attempt.status, 403);
+});
+
+test('GROUP0: deleting with the correct write token succeeds', async () => {
+  const res = await postConv(makeConv('conv-del-ok'));
+  const body = await res.json();
+  assert.equal(res.status, 200);
+
+  const attempt = await fetch(`${base}/api/conversations/conv-del-ok`, {
+    method: 'DELETE',
+    headers: { 'X-Write-Token': body.writeToken },
+  });
+  assert.equal(attempt.status, 200);
+  assert.equal(await conversations.getConversation('conv-del-ok'), null);
+});
+
+test('GROUP0: deleting with an admin token succeeds without a write token', async () => {
+  const res = await postConv(makeConv('conv-del-admin'));
+  assert.equal(res.status, 200);
+
+  const attempt = await fetch(`${base}/api/conversations/conv-del-admin`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': 'test-admin-token-123' },
+  });
+  assert.equal(attempt.status, 200);
+  assert.equal(await conversations.getConversation('conv-del-admin'), null);
 });
