@@ -11,26 +11,20 @@ const KNOWLEDGE_INDEX_FILE = path.join(DATA_DIR, "knowledge_index.json");
 const FEEDBACK_FILE = path.join(DATA_DIR, "feedback.json");
 const QA_KNOWLEDGE_FILE = path.join(DATA_DIR, "qa_knowledge.json");
 
-function buildInvertedIndex(store) {
-  const index = {};
-  for (const entry of store) {
-    const tokens = tokenize(entry.text);
-    const uniqueTokens = [...new Set(tokens)];
-    for (const token of uniqueTokens) {
-      if (!index[token]) index[token] = [];
-      index[token].push(entry.id);
-    }
-  }
-  return index;
-}
-
 function bm25Score(query, store) {
   const k1 = 1.5;
   const b = 0.75;
-  const avgdl = store.reduce((sum, e) => sum + tokenize(e.text).length, 0) / (store.length || 1);
-  const index = buildInvertedIndex(store);
+  const tokenizedDocs = store.map(e => tokenize(e.text));
+  const avgdl = tokenizedDocs.reduce((sum, t) => sum + t.length, 0) / (store.length || 1);
+  const index = {};
+  for (let i = 0; i < store.length; i++) {
+    for (const token of new Set(tokenizedDocs[i])) {
+      if (!index[token]) index[token] = [];
+      index[token].push(store[i].id);
+    }
+  }
+  const idToIdx = new Map(store.map((e, i) => [e.id, i]));
   const N = store.length;
-  const docLengths = store.map(e => tokenize(e.text).length);
   const scores = {};
   for (let i = 0; i < store.length; i++) scores[store[i].id] = 0;
   const queryTokens = [...new Set(tokenize(query))];
@@ -38,11 +32,11 @@ function bm25Score(query, store) {
     const docsWithTerm = index[token] || [];
     const idf = Math.log((N - docsWithTerm.length + 0.5) / (docsWithTerm.length + 0.5) + 1);
     for (const docId of docsWithTerm) {
-      const docIndex = store.findIndex(e => e.id === docId);
-      if (docIndex === -1) continue;
-      const tokens = tokenize(store[docIndex].text);
+      const docIndex = idToIdx.get(docId);
+      if (docIndex === undefined) continue;
+      const tokens = tokenizedDocs[docIndex];
       const tf = tokens.filter(t => t === token).length;
-      const docLen = store[docIndex].text.split(/\s+/).length;
+      const docLen = tokens.length;
       scores[docId] += idf * ((tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (docLen / avgdl))));
     }
   }

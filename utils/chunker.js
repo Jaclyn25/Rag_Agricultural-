@@ -26,7 +26,7 @@ export function chunkText(text, source) {
         chunks.push({ text: buffer.trim(), source: bufferSource || source, category: currentTopic || source, tags: [source.replace(/\.txt$/, ""), currentTopic].filter(Boolean) });
         buffer = "";
       }
-      const sentences = para.split(/(?<=[.!?])\s+/);
+      const sentences = para.split(/(?<=[.!?؟])\s+/);
       const subChunks = chunkBySentences(sentences, source);
       for (const sc of subChunks) {
         sc.category = currentTopic || source;

@@ -9,6 +9,7 @@ const DATA_DIR = process.env.ZERAEH_DATA_DIR || path.join(__dirname, "..", "data
 const CACHE_DIR = path.join(DATA_DIR, "embed_cache");
 const CACHE_FILE = path.join(CACHE_DIR, "cache.json");
 const EMBEDDING_MODEL_ID = "Xenova/all-MiniLM-L6-v2";
+const CACHE_MAX_ENTRIES = 20000;
 
 let extractor = null;
 let embedCache = null;
@@ -57,6 +58,10 @@ export async function generateEmbedding(text) {
   embedCache[key] = vec;
   await updateJsonFile(CACHE_FILE, {}, (cache) => {
     cache[key] = vec;
+    const keys = Object.keys(cache);
+    if (keys.length > CACHE_MAX_ENTRIES) {
+      for (let i = 0; i < keys.length - CACHE_MAX_ENTRIES; i++) delete cache[keys[i]];
+    }
     return cache;
   });
   return vec;
