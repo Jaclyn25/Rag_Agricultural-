@@ -149,8 +149,12 @@ async function runEval() {
   console.log(`  rejectionAccuracy=${(rejectionAccuracy*100).toFixed(0)}% (top dense < ${LOW_CONFIDENCE_THRESHOLD})`);
   console.log(`  avgTopDenseScore=${avgTopDense.toFixed(3)}`);
 
+  if (allResults.length === 0) {
+    console.error("No evaluation results produced (empty dataset?)");
+    process.exit(1);
+  }
+
   const best = [...allResults].sort((a, b) => b.avgF1 - a.avgF1)[0];
-  const bestConfig = alphaConfigs.find(c => c.alpha === best.alpha);
   const bestK = best.topK;
 
   const perQuestion = [];

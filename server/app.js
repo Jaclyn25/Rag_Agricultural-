@@ -12,7 +12,7 @@ import {
   readConversations, saveConversation, deleteConversation, getConversation,
 } from "../utils/conversations.js";
 import {
-  getStoreStats, getKnowledgeIndex, addToKnowledgeIndex, removeFromKnowledgeIndex,
+  getStoreStats, getKnowledgeIndex, removeFromKnowledgeIndex,
   deleteBySource, addFeedback, getFeedback, addQAKnowledge, getQAKnowledge, readStore,
   addChunks, deleteQAKnowledge, deleteChunksByTag,
 } from "../utils/store.js";
@@ -24,6 +24,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 app.disable("x-powered-by");
+
+const TRUST_PROXY = process.env.TRUST_PROXY;
+if (TRUST_PROXY) {
+  app.set("trust proxy", TRUST_PROXY === "true" ? true : /^\d+$/.test(TRUST_PROXY) ? Number(TRUST_PROXY) : TRUST_PROXY);
+}
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -63,10 +68,14 @@ function tokensEqual(a, b) {
   return timingSafeEqual(ha, hb);
 }
 
+function hasValidAdminToken(req) {
+  if (!ADMIN_TOKEN) return false;
+  return tokensEqual(req.get("X-Admin-Token") || "", ADMIN_TOKEN);
+}
+
 function requireAdmin(req, res, next) {
   if (!ADMIN_TOKEN) return res.status(503).json({ error: "ADMIN_TOKEN not configured" });
-  const provided = req.get("X-Admin-Token") || "";
-  if (!tokensEqual(provided, ADMIN_TOKEN)) return res.status(401).json({ error: "unauthorized" });
+  if (!hasValidAdminToken(req)) return res.status(401).json({ error: "unauthorized" });
   next();
 }
 
@@ -100,6 +109,11 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 30;
 function rateLimitMW(req, res, next) {
   const ip = req.ip || req.connection.remoteAddress;
   const now = Date.now();
+  if (rateLimitMap.size > 5000) {
+    for (const [key, arr] of rateLimitMap) {
+      if (!arr.some(t => now - t < RATE_LIMIT_WINDOW)) rateLimitMap.delete(key);
+    }
+  }
   if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
   const timestamps = rateLimitMap.get(ip).filter(t => now - t < RATE_LIMIT_WINDOW);
   if (timestamps.length >= RATE_LIMIT_MAX) {
@@ -124,8 +138,15 @@ function assignExperiment() {
   return experiments[Math.floor(Math.random() * experiments.length)];
 }
 
-app.get("/api/health", (req, res) => {
+function healthHandler(req, res) {
   res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+}
+
+app.get("/api/health", healthHandler);
+app.get("/health", healthHandler);
+
+app.get("/api/admin/verify", requireAdmin, (req, res) => {
+  res.json({ ok: true });
 });
 
 app.post("/api/chat", rateLimitMW, async (req, res) => {
@@ -147,8 +168,13 @@ app.post("/api/chat", rateLimitMW, async (req, res) => {
     return res.status(400).json({ error: "Invalid model" });
   }
 
+  const needsGroq = model === "groq" || useHyde || useExpansion || useSelfRag || useMultiHop || useWebFallback;
+  if (needsGroq && !process.env.GROQ_API_KEY) {
+    return res.status(503).json({ error: "GROQ_API_KEY not configured" });
+  }
+
   const convId = conversationId || crypto.randomUUID();
-  const history = await loadHistory(convId);
+  const history = [...(await loadHistory(convId))];
   history.push({ role: "user", content: question });
 
   const experimentId = assignExperiment();
@@ -181,11 +207,12 @@ app.post("/api/chat", rateLimitMW, async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    res.write(`data: ${JSON.stringify({ strategiesRun: budget.strategiesRun, budgetUsed: budget.budgetUsed })}\n\n`);
+    res.write(`data: ${JSON.stringify({ strategiesRun: budget.strategiesRun, budgetUsed: budget.budgetUsed, experimentId })}\n\n`);
 
     if (noContext) {
       const reply = "عذراً، لا توجد معلومات كافية في قاعدة المعرفة للإجابة على هذا السؤال.";
       history.push({ role: "assistant", content: reply });
+      historyCache.set(convId, history);
       res.write(`data: ${JSON.stringify({ content: reply, conversationId: convId, experimentId })}\n\n`);
       res.write("data: [DONE]\n\n");
       res.end();
@@ -213,7 +240,7 @@ app.post("/api/chat", rateLimitMW, async (req, res) => {
     res.write("data: [DONE]\n\n");
     res.end();
 
-    if (history.length > 50) historyCache.set(convId, history.slice(-30));
+    if (history.length > 0) historyCache.set(convId, history.slice(-100));
   } catch (err) {
     if (controller.signal.aborted || err?.name === "AbortError") {
       if (!res.headersSent) res.status(499).json({ error: "client aborted" });
@@ -282,9 +309,15 @@ app.get("/api/conversations/:id", requireAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/conversations/:id", requireAdmin, async (req, res) => {
+app.delete("/api/conversations/:id", async (req, res) => {
   try {
     if (!req.params.id || req.params.id.length > MAX_ID) return res.status(400).json({ error: "Invalid id" });
+    const conv = await getConversation(req.params.id);
+    if (!conv) return res.json({ ok: true });
+    const writeToken = req.get("X-Write-Token") || "";
+    if (!hasValidAdminToken(req) && (!conv.writeToken || !tokensEqual(writeToken, conv.writeToken))) {
+      return res.status(403).json({ error: "write token required to delete this conversation" });
+    }
     await deleteConversation(req.params.id);
     historyCache.delete(req.params.id);
     res.json({ ok: true });
@@ -346,7 +379,7 @@ app.post("/api/knowledge/delete", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/api/feedback", requireAdmin, async (req, res) => {
+app.post("/api/feedback", rateLimitMW, async (req, res) => {
   try {
     const { conversationId, messageIndex, rating, comment, experimentId } = req.body || {};
     if (typeof conversationId !== "string" || !conversationId || conversationId.length > MAX_ID) {
@@ -429,7 +462,7 @@ app.get("/api/eval/results", async (req, res) => {
 app.post("/api/eval/run", requireAdmin, async (req, res) => {
   try {
     const { exec } = await import("child_process");
-    exec("node server/eval.js", (err, stdout, stderr) => {
+    exec("node server/eval.js", (err, stdout) => {
       if (err) return res.status(500).json({ error: "eval failed" });
       res.json({ ok: true, output: stdout });
     });

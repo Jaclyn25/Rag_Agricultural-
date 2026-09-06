@@ -1,12 +1,12 @@
 import Groq from "groq-sdk";
 import OpenAI from "openai";
 import { generateEmbedding } from "../utils/embed.js";
-import { searchSimilar, addQAKnowledge } from "../utils/store.js";
+import { searchSimilar } from "../utils/store.js";
 import { buildContext } from "../utils/context.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "unset" });
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export const SYSTEM_PROMPT = `أنت مساعد زراعي خبير اسمه "زراعة شات". أجب على أسئلة المستخدم بناءً فقط على المعلومات المتوفرة في السياق المقدم.
@@ -38,9 +38,8 @@ export async function askQuestion(question, history = [], options = {}) {
   if (useMultiHop) {
     results = await multiHopRetrieval(question);
   } else {
-    let queryEmbedding = await generateEmbedding(queryText);
+    const queryEmbedding = await generateEmbedding(queryText);
     results = await searchSimilar(queryEmbedding, 10, queryText, alpha);
-
     if (results.length > 0 && results[0].denseScore < 0.4) {
       const bm25Results = await searchSimilar(queryEmbedding, 10, queryText, 0.0);
       if (bm25Results.length > 0) results = bm25Results;
@@ -57,6 +56,22 @@ export async function askQuestion(question, history = [], options = {}) {
       return await webFallbackRetrieval(question, history, signal);
     }
     return { stream: null, noContext: true, experimentId };
+  }
+
+  if (useSelfRag) {
+    const sufficient = await selfRagCheck(question, buildContext(results, CONTEXT_MAX_CHARS).text);
+    if (!sufficient) {
+      const refined = await expandQuery(question);
+      const retryEmbedding = await generateEmbedding(refined);
+      const retry = await searchSimilar(retryEmbedding, 10, refined, alpha);
+      if (retry.length > 0) {
+        results = retry;
+      } else if (useWebFallback) {
+        return await webFallbackRetrieval(question, history, signal);
+      } else {
+        return { stream: null, noContext: true, experimentId };
+      }
+    }
   }
 
   const built = buildContext(results, CONTEXT_MAX_CHARS);
@@ -95,6 +110,24 @@ export async function askQuestion(question, history = [], options = {}) {
   }
 
   return { stream, sources: usedSources, noContext: false, experimentId };
+}
+
+async function selfRagCheck(question, context) {
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        { role: "system", content: "أنت مدقق معلومات. حدد فقط ما إذا كان السياق المقدم يحتوي معلومات كافية للإجابة على السؤال. أجب بكلمة YES إن كانت كافية، أو NO إن لم تكن. لا تكتب شيئاً آخر." },
+        { role: "user", content: `السياق:\n${context}\n\nالسؤال: ${question}` },
+      ],
+    });
+    const answer = (completion.choices[0]?.message?.content || "").trim();
+    const yes = /(YES|نعم)/i.test(answer);
+    const no = /(NO|لا)/i.test(answer);
+    return yes && !no;
+  } catch {
+    return true;
+  }
 }
 
 async function expandQuery(question) {
@@ -152,7 +185,7 @@ async function multiHopRetrieval(question) {
     const content = completion.choices[0]?.message?.content || "";
     const subQuestions = content.split("\n").filter(l => l.trim()).slice(0, 4);
 
-    let allResults = [];
+    const allResults = [];
     const seen = new Set();
 
     for (const subQ of [question, ...subQuestions]) {

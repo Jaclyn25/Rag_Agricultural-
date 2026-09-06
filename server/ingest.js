@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { chunkText } from "../utils/chunker.js";
 import { generateEmbeddings } from "../utils/embed.js";
-import { addChunks, clearStore, addToKnowledgeIndex, removeFromKnowledgeIndex, getQAKnowledge } from "../utils/store.js";
+import { addChunks, clearStore, addToKnowledgeIndex, getQAKnowledge } from "../utils/store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const KNOWLEDGE_DIR = process.env.ZERAEH_KNOWLEDGE_DIR || path.join(__dirname, "..", "knowledge");
