@@ -80,7 +80,8 @@ export async function clearStore() {
 }
 
 export function cosineSimilarity(a, b) {
-  const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  if (!a || !b || !Array.isArray(a) || !Array.isArray(b)) return 0;
+  const dot = a.reduce((sum, val, i) => sum + val * (b[i] || 0), 0);
   const magA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
   const magB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
   return magA && magB ? dot / (magA * magB) : 0;
@@ -95,10 +96,12 @@ export async function searchSimilar(queryEmbedding, topK = 5, queryText = "", al
     filtered = store.filter(e => e.source === filterSource);
   }
 
-  const denseScores = filtered.map((entry) => ({
-    id: entry.id,
-    score: cosineSimilarity(queryEmbedding, entry.embedding),
-  }));
+  const denseScores = queryEmbedding
+    ? filtered.map((entry) => ({
+        id: entry.id,
+        score: cosineSimilarity(queryEmbedding, entry.embedding),
+      }))
+    : filtered.map((entry) => ({ id: entry.id, score: 0 }));
 
   const maxDense = Math.max(...denseScores.map(d => d.score), 0);
 

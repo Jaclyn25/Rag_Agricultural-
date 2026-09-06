@@ -56,27 +56,32 @@ async function loadCache() {
 }
 
 export async function generateEmbedding(text) {
-  await loadCache();
-  const key = buildCacheKey(text);
-  if (embedCache[key]) return embedCache[key];
-
-  const ext = await getExtractor();
-  const output = await ext(text, { pooling: "none", normalize: false });
-  const vec = normalize(meanPooling(output));
-  embedCache[key] = vec;
   try {
-    await updateJsonFile(CACHE_FILE, {}, (cache) => {
-      cache[key] = vec;
-      const keys = Object.keys(cache);
-      if (keys.length > CACHE_MAX_ENTRIES) {
-        for (let i = 0; i < keys.length - CACHE_MAX_ENTRIES; i++) delete cache[keys[i]];
-      }
-      return cache;
-    });
-  } catch {
-    // In read-only serverless environment, in-memory cache is sufficient
+    await loadCache();
+    const key = buildCacheKey(text);
+    if (embedCache && embedCache[key]) return embedCache[key];
+
+    const ext = await getExtractor();
+    const output = await ext(text, { pooling: "none", normalize: false });
+    const vec = normalize(meanPooling(output));
+    if (embedCache) embedCache[key] = vec;
+    try {
+      await updateJsonFile(CACHE_FILE, {}, (cache) => {
+        cache[key] = vec;
+        const keys = Object.keys(cache);
+        if (keys.length > CACHE_MAX_ENTRIES) {
+          for (let i = 0; i < keys.length - CACHE_MAX_ENTRIES; i++) delete cache[keys[i]];
+        }
+        return cache;
+      });
+    } catch {
+      // In read-only serverless environment, in-memory cache is sufficient
+    }
+    return vec;
+  } catch (err) {
+    console.warn("[generateEmbedding] error:", err?.message || err);
+    return null;
   }
-  return vec;
 }
 
 export async function generateEmbeddings(texts) {
