@@ -1,8 +1,12 @@
-import { pipeline } from "@xenova/transformers";
+import { pipeline, env } from "@xenova/transformers";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createHash } from "node:crypto";
 import { updateJsonFile, readJson } from "./jsonfile.js";
+
+if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  env.cacheDir = "/tmp/.cache";
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.ZERAEH_DATA_DIR || path.join(__dirname, "..", "data");
@@ -56,14 +60,18 @@ export async function generateEmbedding(text) {
   const output = await ext(text, { pooling: "none", normalize: false });
   const vec = normalize(meanPooling(output));
   embedCache[key] = vec;
-  await updateJsonFile(CACHE_FILE, {}, (cache) => {
-    cache[key] = vec;
-    const keys = Object.keys(cache);
-    if (keys.length > CACHE_MAX_ENTRIES) {
-      for (let i = 0; i < keys.length - CACHE_MAX_ENTRIES; i++) delete cache[keys[i]];
-    }
-    return cache;
-  });
+  try {
+    await updateJsonFile(CACHE_FILE, {}, (cache) => {
+      cache[key] = vec;
+      const keys = Object.keys(cache);
+      if (keys.length > CACHE_MAX_ENTRIES) {
+        for (let i = 0; i < keys.length - CACHE_MAX_ENTRIES; i++) delete cache[keys[i]];
+      }
+      return cache;
+    });
+  } catch {
+    // In read-only serverless environment, in-memory cache is sufficient
+  }
   return vec;
 }
 

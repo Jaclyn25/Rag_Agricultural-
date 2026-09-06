@@ -1,0 +1,736 @@
+{
+  "timestamp": 1788538794778,
+  "datasetSize": 40,
+  "retrievalCount": 34,
+  "oodCount": 6,
+  "methodology": "retrieval-only; token-aware keyword match; MRR@K; OOD rejection = top dense < 0.4; citations validated separately (unit-tested)",
+  "best": {
+    "alpha": 0.3,
+    "topK": 3,
+    "config": "BM25-heavy",
+    "avgRecall": 61.3,
+    "avgPrecision": 35.8,
+    "avgF1": 45.2,
+    "avgKeywordMatch": 23,
+    "avgMRR": 64.2,
+    "sourceHitRate": 58.3,
+    "passRate": 76.5,
+    "passes": 26,
+    "fails": 8
+  },
+  "all": [
+    {
+      "alpha": 0.3,
+      "topK": 3,
+      "config": "BM25-heavy",
+      "avgRecall": 61.3,
+      "avgPrecision": 35.8,
+      "avgF1": 45.2,
+      "avgKeywordMatch": 23,
+      "avgMRR": 64.2,
+      "sourceHitRate": 58.3,
+      "passRate": 76.5,
+      "passes": 26,
+      "fails": 8
+    },
+    {
+      "alpha": 0.3,
+      "topK": 5,
+      "config": "BM25-heavy",
+      "avgRecall": 68.6,
+      "avgPrecision": 28.2,
+      "avgF1": 40,
+      "avgKeywordMatch": 30.6,
+      "avgMRR": 64.2,
+      "sourceHitRate": 68.8,
+      "passRate": 76.5,
+      "passes": 26,
+      "fails": 8
+    },
+    {
+      "alpha": 0.3,
+      "topK": 10,
+      "config": "BM25-heavy",
+      "avgRecall": 93.1,
+      "avgPrecision": 20.8,
+      "avgF1": 33.9,
+      "avgKeywordMatch": 38.5,
+      "avgMRR": 68.4,
+      "sourceHitRate": 89.6,
+      "passRate": 100,
+      "passes": 34,
+      "fails": 0
+    },
+    {
+      "alpha": 0.5,
+      "topK": 3,
+      "config": "Balanced",
+      "avgRecall": 56.9,
+      "avgPrecision": 34.3,
+      "avgF1": 42.8,
+      "avgKeywordMatch": 20.6,
+      "avgMRR": 61.8,
+      "sourceHitRate": 56.3,
+      "passRate": 70.6,
+      "passes": 24,
+      "fails": 10
+    },
+    {
+      "alpha": 0.5,
+      "topK": 5,
+      "config": "Balanced",
+      "avgRecall": 65.2,
+      "avgPrecision": 24.9,
+      "avgF1": 36,
+      "avgKeywordMatch": 25,
+      "avgMRR": 62.7,
+      "sourceHitRate": 66.7,
+      "passRate": 73.5,
+      "passes": 25,
+      "fails": 9
+    },
+    {
+      "alpha": 0.5,
+      "topK": 10,
+      "config": "Balanced",
+      "avgRecall": 85.8,
+      "avgPrecision": 17.9,
+      "avgF1": 29.7,
+      "avgKeywordMatch": 32.1,
+      "avgMRR": 66.2,
+      "sourceHitRate": 83.3,
+      "passRate": 94.1,
+      "passes": 32,
+      "fails": 2
+    },
+    {
+      "alpha": 0.7,
+      "topK": 3,
+      "config": "Dense-heavy",
+      "avgRecall": 44.1,
+      "avgPrecision": 20.1,
+      "avgF1": 27.6,
+      "avgKeywordMatch": 8.1,
+      "avgMRR": 44.1,
+      "sourceHitRate": 41.7,
+      "passRate": 55.9,
+      "passes": 19,
+      "fails": 15
+    },
+    {
+      "alpha": 0.7,
+      "topK": 5,
+      "config": "Dense-heavy",
+      "avgRecall": 51.5,
+      "avgPrecision": 14.1,
+      "avgF1": 22.1,
+      "avgKeywordMatch": 8.8,
+      "avgMRR": 45.4,
+      "sourceHitRate": 47.9,
+      "passRate": 61.8,
+      "passes": 21,
+      "fails": 13
+    },
+    {
+      "alpha": 0.7,
+      "topK": 10,
+      "config": "Dense-heavy",
+      "avgRecall": 67.6,
+      "avgPrecision": 10.3,
+      "avgF1": 17.9,
+      "avgKeywordMatch": 12,
+      "avgMRR": 47.9,
+      "sourceHitRate": 66.7,
+      "passRate": 79.4,
+      "passes": 27,
+      "fails": 7
+    },
+    {
+      "alpha": 1,
+      "topK": 3,
+      "config": "Dense-only",
+      "avgRecall": 26.5,
+      "avgPrecision": 10.8,
+      "avgF1": 15.3,
+      "avgKeywordMatch": 2.9,
+      "avgMRR": 21.1,
+      "sourceHitRate": 22.9,
+      "passRate": 32.4,
+      "passes": 11,
+      "fails": 23
+    },
+    {
+      "alpha": 1,
+      "topK": 5,
+      "config": "Dense-only",
+      "avgRecall": 36.3,
+      "avgPrecision": 8.8,
+      "avgF1": 14.2,
+      "avgKeywordMatch": 2.9,
+      "avgMRR": 23.6,
+      "sourceHitRate": 31.3,
+      "passRate": 44.1,
+      "passes": 15,
+      "fails": 19
+    },
+    {
+      "alpha": 1,
+      "topK": 10,
+      "config": "Dense-only",
+      "avgRecall": 49,
+      "avgPrecision": 6.8,
+      "avgF1": 11.9,
+      "avgKeywordMatch": 6.9,
+      "avgMRR": 25.6,
+      "sourceHitRate": 45.8,
+      "passRate": 58.8,
+      "passes": 20,
+      "fails": 14
+    }
+  ],
+  "ood": {
+    "rejectionAccuracy": 16.7,
+    "avgTopDenseScore": 0.663,
+    "perItem": [
+      {
+        "id": "eval-035",
+        "topDenseScore": 0.728,
+        "rejected": false
+      },
+      {
+        "id": "eval-036",
+        "topDenseScore": 0.658,
+        "rejected": false
+      },
+      {
+        "id": "eval-037",
+        "topDenseScore": 0.832,
+        "rejected": false
+      },
+      {
+        "id": "eval-038",
+        "topDenseScore": 0.813,
+        "rejected": false
+      },
+      {
+        "id": "eval-039",
+        "topDenseScore": 0.644,
+        "rejected": false
+      },
+      {
+        "id": "eval-040",
+        "topDenseScore": 0.305,
+        "rejected": true
+      }
+    ]
+  },
+  "perQuestion": [
+    {
+      "id": "eval-001",
+      "category": "تربة",
+      "question": "ما هي أنواع التربة الزراعية؟",
+      "expectedSources": [
+        "03_التربة_والأسمدة.txt"
+      ],
+      "retrievedSources": [
+        "03_التربة_والأسمدة.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-002",
+      "category": "ري",
+      "question": "كيف يتم ري المحاصيل في المناطق الجافة؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt",
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt"
+      ],
+      "retrievedSources": [
+        "02_الري_والمياه.txt",
+        "01_المحاصيل_الزراعية.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    },
+    {
+      "id": "eval-003",
+      "category": "آفات",
+      "question": "ما هي طرق مكافحة الآفات الزراعية؟",
+      "expectedSources": [
+        "04_مكافحة_الآفات.txt"
+      ],
+      "retrievedSources": [
+        "04_مكافحة_الآفات.txt",
+        "06_الزراعة_العضوية.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-004",
+      "category": "زراعة عضوية",
+      "question": "ما هي الزراعة العضوية؟",
+      "expectedSources": [
+        "06_الزراعة_العضوية.txt"
+      ],
+      "retrievedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt",
+        "10_التغير_المناخي_والزراعة.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-005",
+      "category": "تسميد",
+      "question": "كيف يتم التسميد السليم للمحاصيل؟",
+      "expectedSources": [
+        "03_التربة_والأسمدة.txt"
+      ],
+      "retrievedSources": [
+        "13_النخيل_والتمور.txt",
+        "02_الري_والمياه.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-006",
+      "category": "محاصيل",
+      "question": "ما هي أفضل المحاصيل الصيفية؟",
+      "expectedSources": [
+        "01_المحاصيل_الزراعية.txt",
+        "05_المواسم_الزراعية.txt"
+      ],
+      "retrievedSources": [
+        "02_الري_والمياه.txt",
+        "01_المحاصيل_الزراعية.txt",
+        "22_الإرشاد_الزراعي_والتخطيط.txt"
+      ],
+      "success": false,
+      "mrr": 0.5
+    },
+    {
+      "id": "eval-007",
+      "category": "مناخ",
+      "question": "كيف تؤثر التغيرات المناخية على الزراعة؟",
+      "expectedSources": [
+        "10_التغير_المناخي_والزراعة.txt"
+      ],
+      "retrievedSources": [
+        "10_التغير_المناخي_والزراعة.txt",
+        "04_مكافحة_الآفات.txt",
+        "09_الأسواق_والاقتصاد_الزراعي.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-008",
+      "category": "ري",
+      "question": "ما هي طرق الري الحديثة؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt"
+      ],
+      "retrievedSources": [
+        "12_التخزين_والتصنيع_الزراعي.txt",
+        "08_المواشي_والإنتاج_الحيواني.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-009",
+      "category": "حشائش",
+      "question": "كيف يتم مكافحة الحشائش الضارة؟",
+      "expectedSources": [
+        "19_مكافحة_الحشائش.txt"
+      ],
+      "retrievedSources": [
+        "19_مكافحة_الحشائش.txt",
+        "04_مكافحة_الآفات.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-010",
+      "category": "زراعة عضوية",
+      "question": "ما هي فوائد الزراعة العضوية؟",
+      "expectedSources": [
+        "06_الزراعة_العضوية.txt"
+      ],
+      "retrievedSources": [
+        "06_الزراعة_العضوية.txt",
+        "17_النباتات_الطبية_والعطرية.txt",
+        "08_المواشي_والإنتاج_الحيواني.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-011",
+      "category": "استصلاح",
+      "question": "كيف يتم استصلاح الأراضي الصحراوية؟",
+      "expectedSources": [
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt"
+      ],
+      "retrievedSources": [
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt",
+        "02_الري_والمياه.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-012",
+      "category": "أسمدة",
+      "question": "ما هي أنواع الأسمدة الكيميائية؟",
+      "expectedSources": [
+        "03_التربة_والأسمدة.txt"
+      ],
+      "retrievedSources": [
+        "03_التربة_والأسمدة.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-013",
+      "category": "مناخ",
+      "question": "كيف تؤثر التغيرات المناخية على المحاصيل؟",
+      "expectedSources": [
+        "10_التغير_المناخي_والزراعة.txt",
+        "01_المحاصيل_الزراعية.txt"
+      ],
+      "retrievedSources": [
+        "11_الأمراض_النباتية.txt",
+        "08_المواشي_والإنتاج_الحيواني.txt",
+        "10_التغير_المناخي_والزراعة.txt"
+      ],
+      "success": false,
+      "mrr": 0.333
+    },
+    {
+      "id": "eval-014",
+      "category": "حشائش",
+      "question": "ما هي طرق مكافحة الحشائش؟",
+      "expectedSources": [
+        "19_مكافحة_الحشائش.txt"
+      ],
+      "retrievedSources": [
+        "04_مكافحة_الآفات.txt",
+        "06_الزراعة_العضوية.txt",
+        "19_مكافحة_الحشائش.txt"
+      ],
+      "success": true,
+      "mrr": 0.333
+    },
+    {
+      "id": "eval-015",
+      "category": "ري",
+      "question": "كيف يتم ري الأشجار المثمرة؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt",
+        "13_النخيل_والتمور.txt",
+        "14_الفواكه_ذات_النواة_والتفاحيات.txt"
+      ],
+      "retrievedSources": [
+        "02_الري_والمياه.txt",
+        "10_التغير_المناخي_والزراعة.txt",
+        "16_الخضروات_زراعة_وتغذية.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    },
+    {
+      "id": "eval-016",
+      "category": "أمراض",
+      "question": "ما هي الأمراض النباتية الشائعة؟",
+      "expectedSources": [
+        "11_الأمراض_النباتية.txt"
+      ],
+      "retrievedSources": [
+        "11_الأمراض_النباتية.txt",
+        "07_التقنيات_الزراعية_الحديثة.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-017",
+      "category": "تخزين",
+      "question": "كيف يتم تخزين المحاصيل بعد الحصاد؟",
+      "expectedSources": [
+        "12_التخزين_والتصنيع_الزراعي.txt"
+      ],
+      "retrievedSources": [
+        "07_التقنيات_الزراعية_الحديثة.txt",
+        "10_التغير_المناخي_والزراعة.txt",
+        "12_التخزين_والتصنيع_الزراعي.txt"
+      ],
+      "success": true,
+      "mrr": 0.333
+    },
+    {
+      "id": "eval-018",
+      "category": "صوبات",
+      "question": "ما هي فوائد الزراعة في الصوبات؟",
+      "expectedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt"
+      ],
+      "retrievedSources": [
+        "06_الزراعة_العضوية.txt",
+        "17_النباتات_الطبية_والعطرية.txt",
+        "08_المواشي_والإنتاج_الحيواني.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-019",
+      "category": "نخيل",
+      "question": "كيف يتم إكثار النخيل؟",
+      "expectedSources": [
+        "13_النخيل_والتمور.txt"
+      ],
+      "retrievedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "02_الري_والمياه.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-020",
+      "category": "ري",
+      "question": "ما هي طرق الري الحديثة في الزراعة؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt"
+      ],
+      "retrievedSources": [
+        "02_الري_والمياه.txt",
+        "22_الإرشاد_الزراعي_والتخطيط.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    },
+    {
+      "id": "eval-021",
+      "category": "تربة",
+      "question": "ما هي أنواع التربة الموجودة في الحقول الزراعية؟",
+      "expectedSources": [
+        "03_التربة_والأسمدة.txt"
+      ],
+      "retrievedSources": [
+        "03_التربة_والأسمدة.txt",
+        "05_المواسم_الزراعية.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-022",
+      "category": "ري",
+      "question": "كيف يمكن ري النباتات في الأماكن التي يقل فيها المطر؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt",
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt"
+      ],
+      "retrievedSources": [
+        "02_الري_والمياه.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "16_الخضروات_زراعة_وتغذية.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    },
+    {
+      "id": "eval-023",
+      "category": "آفات",
+      "question": "ما الوسائل المستخدمة للقضاء على الحشرات الضارة بالمحاصيل؟",
+      "expectedSources": [
+        "04_مكافحة_الآفات.txt"
+      ],
+      "retrievedSources": [
+        "13_النخيل_والتمور.txt",
+        "06_الزراعة_العضوية.txt",
+        "19_مكافحة_الحشائش.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-024",
+      "category": "زراعة عضوية",
+      "question": "هل يمكن الزراعة بدون استخدام الكيماويات؟",
+      "expectedSources": [
+        "06_الزراعة_العضوية.txt"
+      ],
+      "retrievedSources": [
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "10_التغير_المناخي_والزراعة.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-025",
+      "category": "صوبات",
+      "question": "أيهما أفضل لزراعة الخضر: الصوبة أم الأرض المكشوفة؟",
+      "expectedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "16_الخضروات_زراعة_وتغذية.txt"
+      ],
+      "retrievedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "14_الفواكه_ذات_النواة_والتفاحيات.txt",
+        "13_النخيل_والتمور.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    },
+    {
+      "id": "eval-026",
+      "category": "تربة",
+      "question": "ما هي انواع التربه الزراعيه؟",
+      "expectedSources": [
+        "03_التربة_والأسمدة.txt"
+      ],
+      "retrievedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "03_التربة_والأسمدة.txt",
+        "11_الأمراض_النباتية.txt"
+      ],
+      "success": true,
+      "mrr": 0.5
+    },
+    {
+      "id": "eval-027",
+      "category": "نخيل",
+      "question": "كيف يتم انتاج التمور؟",
+      "expectedSources": [
+        "13_النخيل_والتمور.txt"
+      ],
+      "retrievedSources": [
+        "21_الفطر_الصالح_للأكل.txt",
+        "02_الري_والمياه.txt"
+      ],
+      "success": false,
+      "mrr": 0
+    },
+    {
+      "id": "eval-028",
+      "category": "ري",
+      "question": "ما فائده الري بالتنقيط؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt"
+      ],
+      "retrievedSources": [
+        "20_الهندسة_الزراعية_والصوبات.txt",
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt",
+        "02_الري_والمياه.txt"
+      ],
+      "success": true,
+      "mrr": 0.333
+    },
+    {
+      "id": "eval-029",
+      "category": "محاصيل",
+      "question": "ما هي زراعـــة المحاصيل الصيفيـة؟",
+      "expectedSources": [
+        "01_المحاصيل_الزراعية.txt",
+        "05_المواسم_الزراعية.txt"
+      ],
+      "retrievedSources": [
+        "16_الخضروات_زراعة_وتغذية.txt",
+        "01_المحاصيل_الزراعية.txt",
+        "21_الفطر_الصالح_للأكل.txt"
+      ],
+      "success": false,
+      "mrr": 0.5
+    },
+    {
+      "id": "eval-030",
+      "category": "أمراض",
+      "question": "ما هي امراض النباتات الفطريه؟",
+      "expectedSources": [
+        "11_الأمراض_النباتية.txt"
+      ],
+      "retrievedSources": [
+        "11_الأمراض_النباتية.txt",
+        "21_الفطر_الصالح_للأكل.txt",
+        "13_النخيل_والتمور.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-031",
+      "category": "مناخ",
+      "question": "كيف يؤثر المناخ على جودة المحاصيل داخل الصوبات؟",
+      "expectedSources": [
+        "10_التغير_المناخي_والزراعة.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt"
+      ],
+      "retrievedSources": [
+        "10_التغير_المناخي_والزراعة.txt",
+        "20_الهندسة_الزراعية_والصوبات.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-032",
+      "category": "ري",
+      "question": "ما العلاقة بين الري واستصلاح الأراضي الصحراوية؟",
+      "expectedSources": [
+        "02_الري_والمياه.txt",
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt"
+      ],
+      "retrievedSources": [
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt",
+        "22_الإرشاد_الزراعي_والتخطيط.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    },
+    {
+      "id": "eval-033",
+      "category": "أسواق",
+      "question": "كيف تؤثر المواسم على الأسعار في الأسواق الزراعية؟",
+      "expectedSources": [
+        "05_المواسم_الزراعية.txt",
+        "09_الأسواق_والاقتصاد_الزراعي.txt"
+      ],
+      "retrievedSources": [
+        "05_المواسم_الزراعية.txt",
+        "09_الأسواق_والاقتصاد_الزراعي.txt"
+      ],
+      "success": true,
+      "mrr": 1
+    },
+    {
+      "id": "eval-034",
+      "category": "زراعة",
+      "question": "كيف أزرع الخضروات في المناطق الصحراوية؟",
+      "expectedSources": [
+        "16_الخضروات_زراعة_وتغذية.txt",
+        "18_الزراعة_الصحراوية_واستصلاح_الأراضي.txt"
+      ],
+      "retrievedSources": [
+        "16_الخضروات_زراعة_وتغذية.txt",
+        "11_الأمراض_النباتية.txt",
+        "10_التغير_المناخي_والزراعة.txt"
+      ],
+      "success": false,
+      "mrr": 1
+    }
+  ]
+}

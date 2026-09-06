@@ -23,13 +23,21 @@ export async function readJson(filePath, fallback) {
 }
 
 export async function atomicWriteFile(filePath, data) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2));
   try {
-    await fs.rename(tmp, filePath);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await fs.writeFile(tmp, JSON.stringify(data, null, 2));
+    try {
+      await fs.rename(tmp, filePath);
+    } catch (err) {
+      await fs.unlink(tmp).catch(() => {});
+      throw err;
+    }
   } catch (err) {
-    await fs.unlink(tmp).catch(() => {});
+    if (process.env.VERCEL || err.code === "EROFS" || err.code === "EACCES") {
+      console.warn(`[atomicWriteFile] Skipped writing to read-only filesystem: ${filePath}`);
+      return;
+    }
     throw err;
   }
 }
