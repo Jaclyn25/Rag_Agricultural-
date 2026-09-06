@@ -4,8 +4,12 @@ import { fileURLToPath } from "url";
 import { createHash } from "node:crypto";
 import { updateJsonFile, readJson } from "./jsonfile.js";
 
+import os from "os";
+
 if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-  env.cacheDir = "/tmp/.cache";
+  env.cacheDir = path.join(os.tmpdir(), "transformers-cache");
+  env.allowLocalModels = false;
+  env.useBrowserCache = false;
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

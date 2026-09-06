@@ -83,7 +83,7 @@ function requireAdmin(req, res, next) {
 function sendInternalError(res, err, context) {
   console.error(`[${context}] error:`, err);
   if (!res.headersSent) {
-    res.status(500).json({ error: "internal server error" });
+    res.status(500).json({ error: err?.message || "internal server error" });
   }
 }
 

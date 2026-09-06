@@ -909,8 +909,12 @@ async function init() {
   state.isAdmin = token ? await verifyAdminToken(token) : false;
   updateAdminVisibility();
 
-  const loaded = await loadFromServer();
-  if (!loaded) loadConversations();
+  if (state.isAdmin) {
+    const loaded = await loadFromServer();
+    if (!loaded) loadConversations();
+  } else {
+    loadConversations();
+  }
 
   try {
     const savedId = localStorage.getItem(CURRENT_ID_KEY);
