@@ -8,7 +8,7 @@
     "dev": "node --watch server/index.js",
     "reindex": "node server/seed.js",
     "eval": "node server/eval.js",
-    "reembed": "node -e \"import('../utils/store.js').then(s=>s.readStore()).then(s=>console.log('Re-embed endpoint available at POST /api/knowledge/reembed'))\"",
+    "reembed": "node server/reembed.js",
     "test": "node --test --experimental-test-module-mocks",
     "lint": "eslint ."
   },
