@@ -3,6 +3,7 @@ const state = {
   conversations: [],
   currentId: null,
   isProcessing: false,
+  isAdmin: false,
   settings: { theme: 'dark', fontSize: 'medium', model: 'groq', useHyde: false, useExpansion: false, useSelfRag: false, useMultiHop: false, useWebFallback: false },
 };
 
@@ -20,6 +21,54 @@ function adminFetch(url, opts = {}) {
   const headers = { ...(opts.headers || {}) };
   if (token) headers['X-Admin-Token'] = token;
   return fetch(url, { ...opts, headers });
+}
+
+async function verifyAdminToken(token) {
+  try {
+    const res = await fetch('/api/admin/verify', { headers: { 'X-Admin-Token': token } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function updateAdminVisibility() {
+  const tabs = $('#sidebarTabs');
+  if (tabs) tabs.hidden = !state.isAdmin;
+  const loginBtn = $('#adminLoginBtn');
+  if (loginBtn) loginBtn.style.display = state.isAdmin ? 'none' : '';
+}
+
+function openAdminLogin() {
+  const overlay = $('#adminLoginOverlay');
+  const modal = $('#adminLoginModal');
+  const input = $('#adminLoginInput');
+  if (!overlay || !modal || !input) return;
+  overlay.classList.add('open');
+  modal.classList.add('open');
+  input.value = '';
+  input.focus();
+}
+
+function closeAdminLogin() {
+  const overlay = $('#adminLoginOverlay');
+  const modal = $('#adminLoginModal');
+  if (overlay) overlay.classList.remove('open');
+  if (modal) modal.classList.remove('open');
+}
+
+async function submitAdminLogin() {
+  const input = $('#adminLoginInput');
+  const value = input ? input.value.trim() : '';
+  if (!value) { toast('أدخل رمز الإدارة', 'error'); return; }
+  const ok = await verifyAdminToken(value);
+  if (!ok) { toast('رمز الإدارة غير صحيح', 'error'); return; }
+  sessionStorage.setItem(ADMIN_TOKEN_KEY, value);
+  state.isAdmin = true;
+  closeAdminLogin();
+  updateAdminVisibility();
+  switchSidebarTab('conversations');
+  toast('مرحباً بك في لوحة الإدارة', 'success');
 }
 
 /* ─── DOM Refs ─── */
@@ -55,8 +104,15 @@ async function saveToServer() {
   } catch {}
 }
 
-async function deleteFromServer(id) {
-  try { await adminFetch(`/api/conversations/${id}`, { method: 'DELETE' }); } catch {}
+async function deleteFromServer(id, writeToken) {
+  try {
+    const headers = {};
+    if (writeToken) headers['X-Write-Token'] = writeToken;
+    const res = await adminFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE', headers });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function loadFromServer() {
@@ -151,7 +207,8 @@ function deleteConversation(id, e) {
         state.currentId = state.conversations.length > 0 ? state.conversations[0].id : null;
       }
       saveConversations();
-      await deleteFromServer(id);
+      const deleted = await deleteFromServer(id, conv?.writeToken);
+      if (!deleted && state.isAdmin) toast('تعذر الحذف من الخادم', 'error');
       renderConversations();
       renderMessages();
       toast('تم حذف المحادثة', 'success');
@@ -182,15 +239,16 @@ function addMessageToConv(role, content) {
   renderConversations();
 }
 
-function updateLastAssistant(content, sources) {
+function updateLastAssistant(content, sources, experimentId) {
   const conv = getCurrentConv();
   if (!conv) return;
   const last = conv.messages[conv.messages.length - 1];
   if (last && last.role === 'assistant') {
     last.content = content;
     if (sources) last.sources = sources;
+    if (experimentId) last.experimentId = experimentId;
   } else {
-    conv.messages.push({ role: 'assistant', content, sources: sources || [] });
+    conv.messages.push({ role: 'assistant', content, sources: sources || [], experimentId: experimentId || undefined });
   }
   conv.updatedAt = Date.now();
   saveConversations();
@@ -276,7 +334,7 @@ function appendMessage(text, role, sources, msgIndex) {
     feedbackDiv.innerHTML = `
       <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'up')" title="مفيد">👍</button>
       <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'down')" title="غير مفيد">👎</button>
-      <button class="feedback-btn" onclick="saveAsKnowledge(${msgIndex})" title="حفظ كمعرفة">💾</button>
+      ${state.isAdmin ? `<button class="feedback-btn" onclick="saveAsKnowledge(${msgIndex})" title="حفظ كمعرفة">💾</button>` : ''}
     `;
     div.appendChild(feedbackDiv);
   }
@@ -290,14 +348,23 @@ function appendMessage(text, role, sources, msgIndex) {
 async function sendFeedback(msgIndex, rating) {
   const conv = getCurrentConv();
   if (!conv) return;
+  const msg = conv.messages[msgIndex];
   try {
-    await fetch('/api/feedback', {
+    const res = await fetch('/api/feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationId: conv.id, messageIndex: msgIndex, rating: rating === 'up' ? 1 : -1 }),
+      body: JSON.stringify({
+        conversationId: conv.id,
+        messageIndex: msgIndex,
+        rating: rating === 'up' ? 1 : -1,
+        experimentId: msg?.experimentId,
+      }),
     });
-    toast(rating === 'up' ? 'شكراً على تقييمك!' : 'شكراً، سنحسن الإجابة', 'success');
-  } catch {}
+    if (res.ok) toast(rating === 'up' ? 'شكراً على تقييمك!' : 'شكراً، سنحسن الإجابة', 'success');
+    else toast('تعذر تسجيل التقييم', 'error');
+  } catch {
+    toast('تعذر تسجيل التقييم', 'error');
+  }
 }
 
 async function saveAsKnowledge(msgIndex) {
@@ -589,6 +656,7 @@ async function sendQuestion() {
 
   let answer = '';
   let sources = [];
+  let experimentId = null;
 
   try {
     const body = {
@@ -630,6 +698,7 @@ async function sendQuestion() {
         if (data === '[DONE]') continue;
         try {
           const parsed = JSON.parse(data);
+          if (parsed.experimentId) experimentId = parsed.experimentId;
           if (parsed.content) {
             answer += parsed.content;
             msgDiv.innerHTML = renderMarkdown(answer) + '<span class="stream-cursor"></span>';
@@ -663,11 +732,11 @@ async function sendQuestion() {
     feedbackDiv.innerHTML = `
       <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'up')" title="مفيد">👍</button>
       <button class="feedback-btn" onclick="sendFeedback(${msgIndex}, 'down')" title="غير مفيد">👎</button>
-      <button class="feedback-btn" onclick="saveAsKnowledge(${msgIndex})" title="حفظ كمعرفة">💾</button>
+      ${state.isAdmin ? `<button class="feedback-btn" onclick="saveAsKnowledge(${msgIndex})" title="حفظ كمعرفة">💾</button>` : ''}
     `;
     msgDiv.appendChild(feedbackDiv);
 
-    updateLastAssistant(answer, sources);
+    updateLastAssistant(answer, sources, experimentId);
   } catch (err) {
     msgDiv.innerHTML = `<p>خطأ: ${escapeHtml(err.message)}</p>`;
   }
@@ -752,12 +821,13 @@ function clearAllData() {
     message: 'هل أنت متأكد من حذف جميع المحادثات؟ لا يمكن التراجع عن هذا الإجراء.',
     confirmText: 'حذف الكل',
     onConfirm: async () => {
-      const ids = state.conversations.map((c) => c.id);
+      const items = state.conversations.slice();
+      const ids = items.map((c) => c.id);
       state.conversations = [];
       state.currentId = null;
       localStorage.removeItem(CURRENT_ID_KEY);
       saveConversations();
-      await Promise.all(ids.map((id) => deleteFromServer(id)));
+      await Promise.all(ids.map((id) => deleteFromServer(id, items.find((c) => c.id === id)?.writeToken)));
       renderConversations();
       renderMessages();
       toast('تم حذف جميع المحادثات', 'success');
@@ -834,6 +904,10 @@ function autoResize() {
 /* ─── Init ─── */
 async function init() {
   loadSettings();
+
+  const token = getAdminToken();
+  state.isAdmin = token ? await verifyAdminToken(token) : false;
+  updateAdminVisibility();
 
   const loaded = await loadFromServer();
   if (!loaded) loadConversations();

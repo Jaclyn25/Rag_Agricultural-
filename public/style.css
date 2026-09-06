@@ -793,6 +793,20 @@ pre:hover .copy-btn { opacity: 1; }
 .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
 .modal-message { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
 
+.modal-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.modal-input:focus { outline: none; border-color: var(--primary); }
+
 .modal-actions { display: flex; gap: 10px; justify-content: center; }
 
 .modal-btn {
